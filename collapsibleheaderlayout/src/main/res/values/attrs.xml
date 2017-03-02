@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- ******************************************************************************************************************************* -->
+    <!-- CustomTheme -->
+    <!-- ******************************************************************************************************************************* -->
+
+    <declare-styleable name="HeaderCollapsibleLayout">
+
+        <attr name="topPanelLayoutId" format="reference" />
+
+        <attr name="bottomPanelLayoutId" format="reference" />
+
+        <attr name="overlayFooterLayoutId" format="reference" />
+
+        <attr name="supportAutoExpand" format="boolean" />
+
+    </declare-styleable>
+
+</resources>
