@@ -429,7 +429,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
         });
 
         AnimatorSet animators = new AnimatorSet();
-        animators.setDuration(200L);
+        animators.setDuration(240L);
         animators.playTogether(xTranslate, yTranslate);
         if (listener != null) animators.addListener(listener);
         animators.start();
