@@ -1,12 +1,16 @@
-# HeaderCollapsibleLayout
+## Description ##
 A wrapper layout that can easily split your current layout into header and body, and provides smooth header collapsing action with related event callbacks.
 
-----------
-
-**Basic steps to wrap your original layout to obtain a collapsible header layout:**
-
+## Demo ##
+![](https://github.com/kfrozen/HeaderCollapsibleLayout/raw/master/logo/HCLayoutDemo.gif)
 
 
+## Usage ##
+	dependencies {
+	    compile 'com.troy.collapsibleheaderlayout:collapsibleheaderlayout:1.0.0'
+	}
+
+## Basic steps to wrap your original layout to obtain a collapsible header layout##
 1. Split the original layout to header and body, then put them in separate layout files, for example:
 
 		comp_collapsible_layout_header.xml
