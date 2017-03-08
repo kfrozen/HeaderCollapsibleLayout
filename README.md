@@ -7,7 +7,7 @@ A wrapper layout that can easily split your current layout into header and body,
 
 ## Usage ##
 	dependencies {
-	    compile 'com.troy.collapsibleheaderlayout:collapsibleheaderlayout:1.0.0'
+	    compile 'com.troy.collapsibleheaderlayout:collapsibleheaderlayout:1.0.1'
 	}
 
 ## Basic steps to wrap your original layout to obtain a collapsible header layout##
