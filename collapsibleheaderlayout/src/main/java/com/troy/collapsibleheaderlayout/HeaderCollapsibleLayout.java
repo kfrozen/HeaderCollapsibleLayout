@@ -161,14 +161,14 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 
     private void initTopView(int layoutId, ViewGroup parent)
     {
-        if (layoutId < 0) return;
+        if (layoutId == -1) return;
 
         mTopView = (ViewGroup) LayoutInflater.from(mContext).inflate(layoutId, parent, false);
     }
 
     private void initBottomView(int layoutId, ViewGroup parent)
     {
-        if (layoutId < 0) return;
+        if (layoutId == -1) return;
 
         mBottomView = (ViewGroup) LayoutInflater.from(mContext).inflate(layoutId, parent, false);
     }
