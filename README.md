@@ -7,7 +7,7 @@ A wrapper layout that can easily split your current layout into header and body,
 
 ## Usage ##
 	dependencies {
-	    compile 'com.troy.collapsibleheaderlayout:collapsibleheaderlayout:1.0.1'
+	    compile 'com.troy.collapsibleheaderlayout:collapsibleheaderlayout:1.0.2'
 	}
 
 ## Basic steps to wrap your original layout to obtain a collapsible header layout##
@@ -31,7 +31,7 @@ A wrapper layout that can easily split your current layout into header and body,
 
 **Note that:**
 
-1. If there was NOT a view in your body layout that implemented the *NestedScrollingChild*, please wrap your body layout with a *NestedScrollView*.
+1. If there was NOT a view in your child layout that implemented the *NestedScrollingChild*, please wrap your header/body layout with a *NestedScrollView*.
 2. Setting **app:supportAutoExpand="false"** means the header will not automatically expand when user perform a fling action, instead of which the header will move with user's finger until totally expanded.
 3. We also provide a set of event callbacks:
 

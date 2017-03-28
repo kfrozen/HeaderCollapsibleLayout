@@ -18,13 +18,14 @@ import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver.OnGlobalLayoutListener;
 import android.widget.LinearLayout;
 
 /*
 *  To function correctly, the bottom view has to be an implementation of NestedScrollingChild.
 *  If not, please wrap your bottom view with a NestedScrollView
 */
-public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrollingParent, NestedScrollingChild
+public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrollingParent, NestedScrollingChild, OnGlobalLayoutListener
 {
     public static final int COLLAPSING = 1;
     public static final int COLLAPSED = 2;
@@ -90,21 +91,30 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
     }
 
     @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec)
+    protected void onAttachedToWindow()
     {
-        int height = MeasureSpec.getSize(heightMeasureSpec);
+        super.onAttachedToWindow();
 
-        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(height + mScrollOffsetHeight, MeasureSpec.EXACTLY));
+        if(getViewTreeObserver().isAlive()) getViewTreeObserver().addOnGlobalLayoutListener(this);
     }
 
     @Override
-    protected void onSizeChanged(int w, int h, int oldw, int oldh)
+    protected void onDetachedFromWindow()
     {
-        super.onSizeChanged(w, h, oldw, oldh);
+        super.onDetachedFromWindow();
 
+        if(getViewTreeObserver().isAlive()) getViewTreeObserver().removeGlobalOnLayoutListener(this);
+    }
+
+    @Override
+    public void onGlobalLayout()
+    {
         if (mScrollOffsetHeight == -1)
         {
-            if (mTopView == null) return;
+            if (mTopView == null)
+            {
+                return;
+            }
 
             mScrollOffsetHeight = mTopView.getMeasuredHeight();
 
@@ -112,15 +122,36 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
             {
                 View overlayFooter = mTopView.findViewById(mOverlayFooterLayoutId);
 
-                if (overlayFooter != null) mScrollOffsetHeight = mScrollOffsetHeight - overlayFooter.getMeasuredHeight();
+                if (overlayFooter != null)
+                {
+                    mScrollOffsetHeight = mScrollOffsetHeight - overlayFooter.getMeasuredHeight();
+                }
             }
 
             mScrollOffsetHeightBackup = mScrollOffsetHeight;
 
-            if (mViewFinishInflateListener != null) mViewFinishInflateListener.onViewFinishInflate();
+            if (mViewFinishInflateListener != null)
+            {
+                mViewFinishInflateListener.onViewFinishInflate();
+            }
 
             requestLayout();
         }
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec)
+    {
+        if(mScrollOffsetHeight == -1)
+        {
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+
+            return;
+        }
+
+        int height = MeasureSpec.getSize(heightMeasureSpec);
+
+        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(height + mScrollOffsetHeight, MeasureSpec.EXACTLY));
     }
 
     private void initStyleable(Context context, AttributeSet attrs)
@@ -596,7 +627,6 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 
     /*
     *  When fling up and last-time fling was down side, smoothly collapse the header.
-    *  Notice: the collapsing action can only response to fling up currently.
     */
     @Override
     public boolean onNestedPreFling(View target, float velocityX, float velocityY)
