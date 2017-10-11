@@ -7,7 +7,7 @@ A wrapper layout that can easily split your current layout into header and body,
 
 ## Usage ##
 	dependencies {
-	    compile 'com.troy.collapsibleheaderlayout:collapsibleheaderlayout:1.0.2'
+	    compile 'com.troy.collapsibleheaderlayout:collapsibleheaderlayout:1.0.3'
 	}
 
 ## Basic steps to wrap your original layout to obtain a collapsible header layout##
@@ -45,8 +45,15 @@ A wrapper layout that can easily split your current layout into header and body,
 		
 		    void onHeaderExpanded();
 		
-		    //This event will be continuously sent while header layout is moving
-		    void onHeaderOffsetChanged();
+            /**
+            * Called when the {@link HeaderCollapsibleLayout}'s layout offset has been changed. This allows
+            * child views to implement custom behavior based on the offset (for instance pinning a
+            * view at a certain y value).
+            *
+            * @param verticalOffset the vertical offset for the parent {@link HeaderCollapsibleLayout}, in px
+            * @param headerCollapsedPercentage the latest percentage of the collapsed part of the header view.
+            */
+            void onHeaderOffsetChanged(int verticalOffset, float headerCollapsedPercentage);
 		}
 
 	Set this to your HeaderCollapsibleLayout instance by calling the below method in case you wanna do something response to the collapsing events.

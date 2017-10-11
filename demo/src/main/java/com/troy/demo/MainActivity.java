@@ -79,7 +79,7 @@ public class MainActivity extends AppCompatActivity implements OnHeaderStatusCha
     }
 
     @Override
-    public void onHeaderOffsetChanged()
+    public void onHeaderOffsetChanged(int verticalOffset, float headerCollapsedPercentage)
     {
         //TODO This event will be continuously sent while header layout is moving
     }

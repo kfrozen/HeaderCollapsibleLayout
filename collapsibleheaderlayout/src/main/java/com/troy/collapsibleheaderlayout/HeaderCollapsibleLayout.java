@@ -455,7 +455,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
             @Override
             public void onAnimationUpdate(ValueAnimator animation)
             {
-                if (mHeaderStatusChangedListener != null) mHeaderStatusChangedListener.onHeaderOffsetChanged();
+                if (mHeaderStatusChangedListener != null) mHeaderStatusChangedListener.onHeaderOffsetChanged((int) (mScrollOffsetHeight * animation.getAnimatedFraction()), animation.getAnimatedFraction());
             }
         });
 
@@ -538,7 +538,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
             {
                 if (oldScrollY <= mScrollOffsetHeight * 0.88 && mIsEnabled) //Give 12% buffer height here when sending out the expanding event, for better user experience
                 {
-                    if (mHeaderStatusChangedListener != null) mHeaderStatusChangedListener.onHeaderOffsetChanged();
+                    if (mHeaderStatusChangedListener != null) mHeaderStatusChangedListener.onHeaderOffsetChanged(getScrollY(), (getScrollY() * 1.0f) / mScrollOffsetHeight);
 
                     if (mCurHeaderStatus != EXPANDING)
                     {
@@ -599,7 +599,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 
             scrollBy(0, actualPerformedDy);
 
-            if (mHeaderStatusChangedListener != null && mIsEnabled) mHeaderStatusChangedListener.onHeaderOffsetChanged();
+            if (mHeaderStatusChangedListener != null && mIsEnabled) mHeaderStatusChangedListener.onHeaderOffsetChanged(getScrollY(), (getScrollY() * 1.0f) / mScrollOffsetHeight);
 
             if (dy > 0 && getScrollY() >= mScrollOffsetHeight && mIsEnabled)
             {
@@ -633,38 +633,41 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
     {
         if (velocityY > 0 && lastVelocityY < 0)
         {
-            //Smoothly collapsing the header
-            smoothScrollTo(0, mScrollOffsetHeight, new AnimatorListener()
+            if(mCurHeaderStatus != COLLAPSED)
             {
-                @Override
-                public void onAnimationStart(Animator animation)
+                //Smoothly collapsing the header
+                smoothScrollTo(0, mScrollOffsetHeight, new AnimatorListener()
                 {
-                    mCurHeaderStatus = COLLAPSING;
-                }
-
-                @Override
-                public void onAnimationEnd(Animator animation)
-                {
-                    if (mHeaderStatusChangedListener != null && mIsEnabled)
+                    @Override
+                    public void onAnimationStart(Animator animation)
                     {
-                        mHeaderStatusChangedListener.onHeaderCollapsed();
+                        mCurHeaderStatus = COLLAPSING;
                     }
 
-                    mCurHeaderStatus = COLLAPSED;
-                }
+                    @Override
+                    public void onAnimationEnd(Animator animation)
+                    {
+                        if (mHeaderStatusChangedListener != null && mIsEnabled)
+                        {
+                            mHeaderStatusChangedListener.onHeaderCollapsed();
+                        }
 
-                @Override
-                public void onAnimationCancel(Animator animation)
-                {
+                        mCurHeaderStatus = COLLAPSED;
+                    }
 
-                }
+                    @Override
+                    public void onAnimationCancel(Animator animation)
+                    {
 
-                @Override
-                public void onAnimationRepeat(Animator animation)
-                {
+                    }
 
-                }
-            });
+                    @Override
+                    public void onAnimationRepeat(Animator animation)
+                    {
+
+                    }
+                });
+            }
 
             lastVelocityY = velocityY;
 
@@ -672,7 +675,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
         }
         else if (velocityY < 0 && unconsumedDy < 0) //Fling down and has unconsumed vertical value, should handle this fling
         {
-            if (mSupportAutoExpand)
+            if (mSupportAutoExpand && mCurHeaderStatus != EXPANDED)
             {
                 //Smoothly expanding the header, related callbacks would be called in onNestedScroll
                 smoothScrollTo(0, 0, new AnimatorListener()
