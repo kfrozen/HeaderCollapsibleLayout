@@ -14,7 +14,8 @@
             android:layout_height="match_parent"
             app:topPanelLayoutId="@layout/comp_collapsible_layout_header"
             app:bottomPanelLayoutId="@layout/comp_collapsible_layout_body"
-            app:overlayFooterLayoutId="@+id/demo_bottom_overlay"/>
+            app:overlayFooterLayoutId="@+id/demo_bottom_overlay"
+            app:overshootDistance="10000"/>
             <!--app:supportAutoExpand="false" />-->
 
 </FrameLayout>

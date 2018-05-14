@@ -51,7 +51,7 @@ public class MainActivity extends AppCompatActivity implements OnHeaderStatusCha
 
         mList.setAdapter(mAdapter);
 
-        mHeaderCollapsibleLayout.setOnHeaderStatusChangedListener(this);
+        mHeaderCollapsibleLayout.addOnHeaderStatusChangedListener(this);
     }
 
     @Override
@@ -79,8 +79,7 @@ public class MainActivity extends AppCompatActivity implements OnHeaderStatusCha
     }
 
     @Override
-    public void onHeaderOffsetChanged(int verticalOffset, float headerCollapsedPercentage)
-    {
+    public void onHeaderOffsetChanged(int verticalOffset, int headerHeight, float headerCollapsedPercentage, boolean isScrollingDown) {
         //TODO This event will be continuously sent while header layout is moving
     }
 }

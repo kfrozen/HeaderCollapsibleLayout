@@ -8,12 +8,11 @@
     <declare-styleable name="HeaderCollapsibleLayout">
 
         <attr name="topPanelLayoutId" format="reference" />
-
         <attr name="bottomPanelLayoutId" format="reference" />
-
         <attr name="overlayFooterLayoutId" format="reference" />
-
-        <attr name="supportAutoExpand" format="boolean" />
+        <attr name="supportFlingAction" format="boolean" />
+        <attr name="autoDrawerModeEnabled" format="boolean" />
+        <attr name="overshootDistance" format="integer" />
 
     </declare-styleable>
 
