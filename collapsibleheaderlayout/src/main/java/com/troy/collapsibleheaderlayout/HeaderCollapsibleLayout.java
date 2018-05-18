@@ -2,8 +2,7 @@ package com.troy.collapsibleheaderlayout;
 
 import android.animation.Animator;
 import android.animation.Animator.AnimatorListener;
-import android.animation.AnimatorSet;
-import android.animation.ObjectAnimator;
+import android.animation.TypeEvaluator;
 import android.animation.ValueAnimator;
 import android.animation.ValueAnimator.AnimatorUpdateListener;
 import android.content.Context;
@@ -29,784 +28,851 @@ import java.util.List;
 *  To function correctly, the bottom view has to be an implementation of NestedScrollingChild.
 *  If not, please wrap your bottom view with a NestedScrollView
 */
-public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrollingParent, NestedScrollingChild, OnGlobalLayoutListener
-{
-    public static final int COLLAPSING = 1;
-    public static final int COLLAPSED = 2;
-    public static final int EXPANDING = 3;
-    public static final int EXPANDED = 4;
-
-    @IntDef({COLLAPSING, COLLAPSED, EXPANDING, EXPANDED})
-    public @interface HeaderStatus {
-    }
-
-    private Context mContext;
-    private OnViewFinishInflateListener mViewFinishInflateListener;
-    private List<OnHeaderStatusChangedListener> mHeaderStatusChangedListeners;
-    private int mScrollOffsetHeight = -1;
-    private int mScrollOffsetHeightBackup = -1;
-    private int mOverlayFooterLayoutId = -1;
-    private int mOvershootDistance;
-    private boolean mSupportFlingAction;
-    private boolean mAutoDrawerModeEnabled = true;
-    private boolean mIsEnabled = true;
-    protected boolean mIsScrollingDown;
-    protected boolean mIsBeingDragged;
-    @HeaderStatus
-    protected int mCurHeaderStatus;
-    private ViewGroup mTopView;
-    private ViewGroup mBottomView;
+public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrollingParent, NestedScrollingChild, OnGlobalLayoutListener {
+	public static final int COLLAPSING = 1;
+	public static final int COLLAPSED = 2;
+	public static final int EXPANDING = 3;
+	public static final int EXPANDED = 4;
+
+	@IntDef({COLLAPSING, COLLAPSED, EXPANDING, EXPANDED})
+	public @interface HeaderStatus {
+	}
+
+	private Context mContext;
+	private OnViewFinishInflateListener mViewFinishInflateListener;
+	private List<OnHeaderStatusChangedListener> mHeaderStatusChangedListeners;
+	private int mOrgHeaderHeight = -1;
+	private int mOrgHeaderHeightBackup = -1;
+	private int mOverlayFooterLayoutId = -1;
+	private int mOvershootDistance;
+	private boolean mSupportFlingAction;
+	private boolean mAutoDrawerModeEnabled = true;
+	private boolean mIsEnabled = true;
+	protected boolean mIsScrollingDown;
+	protected boolean mIsBeingDragged;
+	@HeaderStatus
+	protected int mCurHeaderStatus;
+	private ViewGroup mTopView;
+	private ViewGroup mBottomView;
+
+	private NestedScrollingParentHelper mParentHelper;
+	private NestedScrollingChildHelper mChildHelper;
+	private Animator mBounceBackForOvershooting;
+	private int lastHeaderHeight; //Record of header height each time before it changes
+
+	public HeaderCollapsibleLayout(Context context) {
+		super(context);
+
+		init(context, null);
+	}
+
+	public HeaderCollapsibleLayout(Context context, AttributeSet attrs) {
+		super(context, attrs);
+
+		init(context, attrs);
+	}
+
+	public HeaderCollapsibleLayout(Context context, AttributeSet attrs, int defStyleAttr) {
+		super(context, attrs, defStyleAttr);
+
+		init(context, attrs);
+	}
+
+	private void init(Context context, AttributeSet attrs) {
+		mContext = context;
+
+		mCurHeaderStatus = EXPANDED;
+
+		setOrientation(VERTICAL);
+
+		initStyleable(context, attrs);
+
+		mParentHelper = new NestedScrollingParentHelper(this);
+		mChildHelper = new NestedScrollingChildHelper(this);
+
+		setNestedScrollingEnabled(true);
+	}
+
+	@Override
+	protected void onAttachedToWindow() {
+		super.onAttachedToWindow();
+
+		if (getViewTreeObserver().isAlive()) getViewTreeObserver().addOnGlobalLayoutListener(this);
+	}
+
+	@Override
+	protected void onDetachedFromWindow() {
+		super.onDetachedFromWindow();
+
+		if (getViewTreeObserver().isAlive())
+			getViewTreeObserver().removeGlobalOnLayoutListener(this);
+	}
+
+	@Override
+	final public void onGlobalLayout() {
+		if (mOrgHeaderHeight == -1) {
+			if (mTopView == null || mTopView.getMeasuredHeight() == 0) {
+				return;
+			}
+
+			mOrgHeaderHeight = mTopView.getMeasuredHeight();
+			if (mOvershootDistance < 0) {
+				mOvershootDistance = 0;
+			} else if (mOvershootDistance > (Integer.MAX_VALUE - getHeight())) {
+				getHeight();
+			}
+
+			if (mOverlayFooterLayoutId != -1) {
+				View overlayFooter = mTopView.findViewById(mOverlayFooterLayoutId);
+
+				if (overlayFooter != null) {
+					mOrgHeaderHeight = mOrgHeaderHeight - overlayFooter.getMeasuredHeight();
+				}
+			}
+
+			mOrgHeaderHeightBackup = mOrgHeaderHeight;
+
+			if (mViewFinishInflateListener != null) {
+				mViewFinishInflateListener.onViewFinishInflate();
+			}
+
+			onFirstLayout();
+
+			requestLayout();
+		}
+	}
+
+	protected void onFirstLayout() {
+	}
+
+	@Override
+	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+		super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+//        if (mOrgHeaderHeight == -1) {
+//            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+//
+//            return;
+//        }
+//
+//        int height = MeasureSpec.getSize(heightMeasureSpec);
+//
+//        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(height + mOrgHeaderHeight, MeasureSpec.EXACTLY));
+	}
+
+	private void initStyleable(Context context, AttributeSet attrs) {
+		if (attrs == null) {
+			return;
+		}
+
+		final TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.HeaderCollapsibleLayout, 0, 0);
+
+		if (a.hasValue(R.styleable.HeaderCollapsibleLayout_topPanelLayoutId)) {
+			initTopView(a.getResourceId(R.styleable.HeaderCollapsibleLayout_topPanelLayoutId, -1), this);
+		}
+
+		if (a.hasValue(R.styleable.HeaderCollapsibleLayout_bottomPanelLayoutId)) {
+			initBottomView(a.getResourceId(R.styleable.HeaderCollapsibleLayout_bottomPanelLayoutId, -1), this);
+		}
+
+		if (a.hasValue(R.styleable.HeaderCollapsibleLayout_overlayFooterLayoutId)) {
+			mOverlayFooterLayoutId = a.getResourceId(R.styleable.HeaderCollapsibleLayout_overlayFooterLayoutId, -1);
+		}
+
+		if (a.hasValue(R.styleable.HeaderCollapsibleLayout_supportFlingAction)) {
+			mSupportFlingAction = a.getBoolean(R.styleable.HeaderCollapsibleLayout_supportFlingAction, false);
+		}
+
+		if (a.hasValue(R.styleable.HeaderCollapsibleLayout_autoDrawerModeEnabled)) {
+			mAutoDrawerModeEnabled = a.getBoolean(R.styleable.HeaderCollapsibleLayout_autoDrawerModeEnabled, true);
+		}
+
+		if (a.hasValue(R.styleable.HeaderCollapsibleLayout_overshootDistance)) {
+			mOvershootDistance = a.getInteger(R.styleable.HeaderCollapsibleLayout_overshootDistance, 0);
+		}
+
+		if (mTopView != null) addView(mTopView);
+
+		if (mBottomView != null) addView(mBottomView);
+
+		a.recycle();
+	}
+
+	private void initTopView(int layoutId, ViewGroup parent) {
+		if (layoutId == -1) return;
+
+		mTopView = (ViewGroup) LayoutInflater.from(mContext).inflate(layoutId, parent, false);
+	}
 
-    private NestedScrollingParentHelper mParentHelper;
-    private NestedScrollingChildHelper mChildHelper;
-    private AnimatorSet mBounceBackForOvershooting;
+	private void initBottomView(int layoutId, ViewGroup parent) {
+		if (layoutId == -1) return;
 
-    public HeaderCollapsibleLayout(Context context) {
-        super(context);
-
-        init(context, null);
-    }
+		mBottomView = (ViewGroup) LayoutInflater.from(mContext).inflate(layoutId, parent, false);
+	}
 
-    public HeaderCollapsibleLayout(Context context, AttributeSet attrs) {
-        super(context, attrs);
+	/*********
+	 * Public methods starts
+	 ****************/
+	public void addOnHeaderStatusChangedListener(OnHeaderStatusChangedListener callback) {
+		if (mHeaderStatusChangedListeners == null) {
+			mHeaderStatusChangedListeners = new ArrayList<>();
+		}
+		if (mHeaderStatusChangedListeners.contains(callback)) {
+			return;
+		}
+		mHeaderStatusChangedListeners.add(callback);
+	}
+
+	public void removeOnHeaderStatusChangedListener(OnHeaderStatusChangedListener listener) {
+		if (this.mHeaderStatusChangedListeners == null) {
+			return;
+		}
+		mHeaderStatusChangedListeners.remove(listener);
+	}
+
+	public void setOnViewFinishInflateListener(OnViewFinishInflateListener listener) {
+		mViewFinishInflateListener = listener;
+	}
+
+	public void removeOnViewFinishInflateListener() {
+		mViewFinishInflateListener = null;
+	}
+
+	public void reset() {
+		mCurHeaderStatus = EXPANDED;
+	}
 
-        init(context, attrs);
-    }
-
-    public HeaderCollapsibleLayout(Context context, AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr);
-
-        init(context, attrs);
-    }
-
-    private void init(Context context, AttributeSet attrs) {
-        mContext = context;
-
-        mCurHeaderStatus = EXPANDED;
-
-        setOrientation(VERTICAL);
-
-        initStyleable(context, attrs);
-
-        mParentHelper = new NestedScrollingParentHelper(this);
-        mChildHelper = new NestedScrollingChildHelper(this);
-
-        setNestedScrollingEnabled(true);
-    }
-
-    @Override
-    protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-
-        if (getViewTreeObserver().isAlive()) getViewTreeObserver().addOnGlobalLayoutListener(this);
-    }
-
-    @Override
-    protected void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-
-        if (getViewTreeObserver().isAlive())
-            getViewTreeObserver().removeGlobalOnLayoutListener(this);
-    }
-
-    @Override
-    final public void onGlobalLayout() {
-        if (mScrollOffsetHeight == -1) {
-            if (mTopView == null || mTopView.getMeasuredHeight() == 0) {
-                return;
-            }
-
-            mScrollOffsetHeight = mTopView.getMeasuredHeight();
-            if (mOvershootDistance < 0) {
-                mOvershootDistance = 0;
-            } else if (mOvershootDistance > (Integer.MAX_VALUE - getHeight())) {
-                getHeight();
-            }
-
-            if (mOverlayFooterLayoutId != -1) {
-                View overlayFooter = mTopView.findViewById(mOverlayFooterLayoutId);
-
-                if (overlayFooter != null) {
-                    mScrollOffsetHeight = mScrollOffsetHeight - overlayFooter.getMeasuredHeight();
-                }
-            }
-
-            mScrollOffsetHeightBackup = mScrollOffsetHeight;
-
-            if (mViewFinishInflateListener != null) {
-                mViewFinishInflateListener.onViewFinishInflate();
-            }
-
-            onFirstLayout();
-
-            requestLayout();
-        }
-    }
-
-    protected void onFirstLayout() {
-    }
-
-    @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        if (mScrollOffsetHeight == -1) {
-            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-
-            return;
-        }
-
-        int height = MeasureSpec.getSize(heightMeasureSpec);
-
-        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(height + mScrollOffsetHeight, MeasureSpec.EXACTLY));
-    }
-
-    private void initStyleable(Context context, AttributeSet attrs) {
-        if (attrs == null) {
-            return;
-        }
-
-        final TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.HeaderCollapsibleLayout, 0, 0);
-
-        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_topPanelLayoutId)) {
-            initTopView(a.getResourceId(R.styleable.HeaderCollapsibleLayout_topPanelLayoutId, -1), this);
-        }
-
-        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_bottomPanelLayoutId)) {
-            initBottomView(a.getResourceId(R.styleable.HeaderCollapsibleLayout_bottomPanelLayoutId, -1), this);
-        }
-
-        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_overlayFooterLayoutId)) {
-            mOverlayFooterLayoutId = a.getResourceId(R.styleable.HeaderCollapsibleLayout_overlayFooterLayoutId, -1);
-        }
-
-        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_supportFlingAction)) {
-            mSupportFlingAction = a.getBoolean(R.styleable.HeaderCollapsibleLayout_supportFlingAction, false);
-        }
-
-        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_autoDrawerModeEnabled)) {
-            mAutoDrawerModeEnabled = a.getBoolean(R.styleable.HeaderCollapsibleLayout_autoDrawerModeEnabled, true);
-        }
-
-        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_overshootDistance)) {
-            mOvershootDistance = a.getInteger(R.styleable.HeaderCollapsibleLayout_overshootDistance, 0);
-        }
-
-        if (mTopView != null) addView(mTopView);
-
-        if (mBottomView != null) addView(mBottomView);
-
-        a.recycle();
-    }
-
-    private void initTopView(int layoutId, ViewGroup parent) {
-        if (layoutId == -1) return;
-
-        mTopView = (ViewGroup) LayoutInflater.from(mContext).inflate(layoutId, parent, false);
-    }
-
-    private void initBottomView(int layoutId, ViewGroup parent) {
-        if (layoutId == -1) return;
-
-        mBottomView = (ViewGroup) LayoutInflater.from(mContext).inflate(layoutId, parent, false);
-    }
-
-    /*********
-     * Public methods starts
-     ****************/
-    public void addOnHeaderStatusChangedListener(OnHeaderStatusChangedListener callback) {
-        if (mHeaderStatusChangedListeners == null) {
-            mHeaderStatusChangedListeners = new ArrayList<>();
-        }
-        if (mHeaderStatusChangedListeners.contains(callback)) {
-            return;
-        }
-        mHeaderStatusChangedListeners.add(callback);
-    }
-
-    public void removeOnHeaderStatusChangedListener(OnHeaderStatusChangedListener listener) {
-        if (this.mHeaderStatusChangedListeners == null) {
-            return;
-        }
-        mHeaderStatusChangedListeners.remove(listener);
-    }
-
-    public void setOnViewFinishInflateListener(OnViewFinishInflateListener listener) {
-        mViewFinishInflateListener = listener;
-    }
-
-    public void removeOnViewFinishInflateListener() {
-        mViewFinishInflateListener = null;
-    }
-
-    public void reset() {
-        mCurHeaderStatus = EXPANDED;
-    }
-
-    @HeaderStatus
-    public int getCurrentHeaderStatus() {
-        return mCurHeaderStatus;
-    }
-
-    public void collapse() {
-        scrollTo(0, mScrollOffsetHeight);
-
-        mCurHeaderStatus = COLLAPSED;
-
-        lastVelocityY = 0.1f; //To make sure next fling action performs well
-    }
-
-    public void smoothCollapse() {
-        smoothScrollTo(0, mScrollOffsetHeight, new AnimatorListener() {
-            @Override
-            public void onAnimationStart(Animator animation) {
-                mCurHeaderStatus = COLLAPSING;
-
-                if (mHeaderStatusChangedListeners != null){
-                    for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-                        l.onHeaderStartCollapsing();
-                    }
-                }
-
-            }
-
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                mCurHeaderStatus = COLLAPSED;
-
-                if (mHeaderStatusChangedListeners != null){
-                    for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-                        l.onHeaderCollapsed();
-                    }
-                }
-            }
-
-            @Override
-            public void onAnimationCancel(Animator animation) {
-
-            }
-
-            @Override
-            public void onAnimationRepeat(Animator animation) {
-
-            }
-        });
-
-        lastVelocityY = 0.1f; //To make sure next fling action performs well
-    }
-
-    public View getTopView() {
-        return mTopView;
-    }
-
-    public void expand() {
-        scrollTo(0, 0);
-
-        mCurHeaderStatus = EXPANDED;
-
-        lastVelocityY = -0.1f; //To make sure next fling action performs well
-    }
-
-    public void smoothExpand() {
-        smoothScrollTo(0, 0, new AnimatorListener() {
-            @Override
-            public void onAnimationStart(Animator animation) {
-                mCurHeaderStatus = EXPANDING;
-
-                if (mHeaderStatusChangedListeners != null){
-                    for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-                        l.onHeaderStartExpanding();
-                    }
-                }
-            }
-
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                mCurHeaderStatus = EXPANDED;
-
-                if (mHeaderStatusChangedListeners != null){
-                    for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-                        l.onHeaderExpanded();
-                    }
-                }
-            }
-
-            @Override
-            public void onAnimationCancel(Animator animation) {
-
-            }
-
-            @Override
-            public void onAnimationRepeat(Animator animation) {
-
-            }
-        });
-
-        lastVelocityY = -0.1f; //To make sure next fling action performs well
-    }
-
-    public void disableCollapsing() {
-        if (mScrollOffsetHeight != 0) {
-            mScrollOffsetHeightBackup = mScrollOffsetHeight;
-
-            mScrollOffsetHeight = 0;
-        }
-
-        mIsEnabled = false;
-    }
-
-    public void enableCollapsing() {
-        mScrollOffsetHeight = mScrollOffsetHeightBackup;
-
-        mIsEnabled = true;
-    }
-
-    public boolean isEnabled() {
-        return mIsEnabled;
-    }
-
-    /*********
-     * Public methods ends
-     ****************/
-
-    // NestedScrollingChild
-    @Override
-    public void setNestedScrollingEnabled(boolean enabled) {
-        mChildHelper.setNestedScrollingEnabled(enabled);
-    }
-
-    @Override
-    public boolean isNestedScrollingEnabled() {
-        return mChildHelper.isNestedScrollingEnabled();
-    }
-
-    @Override
-    public boolean startNestedScroll(int axes) {
-        return mChildHelper.startNestedScroll(axes);
-    }
-
-    @Override
-    public void stopNestedScroll() {
-        mChildHelper.stopNestedScroll();
-    }
-
-    @Override
-    public boolean hasNestedScrollingParent() {
-        return mChildHelper.hasNestedScrollingParent();
-    }
-
-    @Override
-    public boolean dispatchNestedScroll(int dxConsumed, int dyConsumed, int dxUnconsumed,
-                                        int dyUnconsumed, int[] offsetInWindow) {
-        return mChildHelper.dispatchNestedScroll(dxConsumed, dyConsumed, dxUnconsumed, dyUnconsumed,
-                offsetInWindow);
-    }
-
-    @Override
-    public boolean dispatchNestedPreScroll(int dx, int dy, int[] consumed, int[] offsetInWindow) {
-        return mChildHelper.dispatchNestedPreScroll(dx, dy, consumed, offsetInWindow);
-    }
-
-    @Override
-    public boolean dispatchNestedFling(float velocityX, float velocityY, boolean consumed) {
-        return mChildHelper.dispatchNestedFling(velocityX, velocityY, consumed);
-    }
-
-    @Override
-    public boolean dispatchNestedPreFling(float velocityX, float velocityY) {
-        return mChildHelper.dispatchNestedPreFling(velocityX, velocityY);
-    }
-
-    // NestedScrollingParent
-
-    /*
+	@HeaderStatus
+	public int getCurrentHeaderStatus() {
+		return mCurHeaderStatus;
+	}
+
+	public void collapse() {
+		scrollTo(0, mOrgHeaderHeight);
+
+		mCurHeaderStatus = COLLAPSED;
+
+		lastVelocityY = 0.1f; //To make sure next fling action performs well
+	}
+
+	public void smoothCollapse() {
+		smoothChangeHeaderHeightTo(0, new AnimatorListener() {
+			@Override
+			public void onAnimationStart(Animator animation) {
+				mCurHeaderStatus = COLLAPSING;
+
+				if (mHeaderStatusChangedListeners != null) {
+					for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+						l.onHeaderStartCollapsing();
+					}
+				}
+
+			}
+
+			@Override
+			public void onAnimationEnd(Animator animation) {
+				mCurHeaderStatus = COLLAPSED;
+
+				if (mHeaderStatusChangedListeners != null) {
+					for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+						l.onHeaderCollapsed();
+					}
+				}
+			}
+
+			@Override
+			public void onAnimationCancel(Animator animation) {
+
+			}
+
+			@Override
+			public void onAnimationRepeat(Animator animation) {
+
+			}
+		});
+
+		lastVelocityY = 0.1f; //To make sure next fling action performs well
+	}
+
+	public View getTopView() {
+		return mTopView;
+	}
+
+	public void expand() {
+		scrollTo(0, 0);
+
+		mCurHeaderStatus = EXPANDED;
+
+		lastVelocityY = -0.1f; //To make sure next fling action performs well
+	}
+
+	public void smoothExpand() {
+		smoothChangeHeaderHeightTo(mOrgHeaderHeight, new AnimatorListener() {
+			@Override
+			public void onAnimationStart(Animator animation) {
+				mCurHeaderStatus = EXPANDING;
+
+				if (mHeaderStatusChangedListeners != null) {
+					for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+						l.onHeaderStartExpanding();
+					}
+				}
+			}
+
+			@Override
+			public void onAnimationEnd(Animator animation) {
+				mCurHeaderStatus = EXPANDED;
+
+				if (mHeaderStatusChangedListeners != null) {
+					for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+						l.onHeaderExpanded();
+					}
+				}
+			}
+
+			@Override
+			public void onAnimationCancel(Animator animation) {
+
+			}
+
+			@Override
+			public void onAnimationRepeat(Animator animation) {
+
+			}
+		});
+
+		lastVelocityY = -0.1f; //To make sure next fling action performs well
+	}
+
+	public void disableCollapsing() {
+		if (mOrgHeaderHeight != 0) {
+			mOrgHeaderHeightBackup = mOrgHeaderHeight;
+			mOrgHeaderHeight = 0;
+		}
+
+		mIsEnabled = false;
+	}
+
+	public void enableCollapsing() {
+		mOrgHeaderHeight = mOrgHeaderHeightBackup;
+		mIsEnabled = true;
+	}
+
+	public boolean isEnabled() {
+		return mIsEnabled;
+	}
+
+	/*********
+	 * Public methods ends
+	 ****************/
+
+	// NestedScrollingChild
+	@Override
+	public void setNestedScrollingEnabled(boolean enabled) {
+		mChildHelper.setNestedScrollingEnabled(enabled);
+	}
+
+	@Override
+	public boolean isNestedScrollingEnabled() {
+		return mChildHelper.isNestedScrollingEnabled();
+	}
+
+	@Override
+	public boolean startNestedScroll(int axes) {
+		return mChildHelper.startNestedScroll(axes);
+	}
+
+	@Override
+	public void stopNestedScroll() {
+		mChildHelper.stopNestedScroll();
+	}
+
+	@Override
+	public boolean hasNestedScrollingParent() {
+		return mChildHelper.hasNestedScrollingParent();
+	}
+
+	@Override
+	public boolean dispatchNestedScroll(int dxConsumed, int dyConsumed, int dxUnconsumed,
+										int dyUnconsumed, int[] offsetInWindow) {
+		return mChildHelper.dispatchNestedScroll(dxConsumed, dyConsumed, dxUnconsumed, dyUnconsumed,
+				offsetInWindow);
+	}
+
+	@Override
+	public boolean dispatchNestedPreScroll(int dx, int dy, int[] consumed, int[] offsetInWindow) {
+		return mChildHelper.dispatchNestedPreScroll(dx, dy, consumed, offsetInWindow);
+	}
+
+	@Override
+	public boolean dispatchNestedFling(float velocityX, float velocityY, boolean consumed) {
+		return mChildHelper.dispatchNestedFling(velocityX, velocityY, consumed);
+	}
+
+	@Override
+	public boolean dispatchNestedPreFling(float velocityX, float velocityY) {
+		return mChildHelper.dispatchNestedPreFling(velocityX, velocityY);
+	}
+
+	// NestedScrollingParent
+
+	/*
 	*  stop intercepting nested scroll event when header layout has been shown or hidden.
 	*/
-    private boolean shouldConsumeNestedScroll(int dy) {
-        if (dy > 0) {
-            return getScrollY() < mScrollOffsetHeight;
-        } else {
-            return getScrollY() > -mOvershootDistance;
-        }
-    }
+	private boolean shouldConsumeNestedScroll(int dy) {
+		if (dy > 0) {
+			//return getScrollY() < mOrgHeaderHeight;
+			return mTopView.getHeight() > 0;
+		} else {
+			//return getScrollY() > -mOvershootDistance;
+			return mTopView.getHeight() < mOrgHeaderHeight + mOvershootDistance;
+		}
+	}
 
-    /*
+	/*
 	*  prevent the view to be over scrolled by a long drag move
 	*/
-    private boolean isReachedEdge(int dy) {
-        if (dy < 0) {
-            return Math.abs(dy) > (getScrollY() + mOvershootDistance);
-        } else {
-            return dy > (mScrollOffsetHeight - getScrollY());
-        }
-    }
+	private boolean isReachedEdge(int dy) {
+		if (dy > 0) {
+			//return dy > (mOrgHeaderHeight - getScrollY());
+			return dy > mTopView.getHeight();
+		} else {
+			//return Math.abs(dy) > (getScrollY() + mOvershootDistance);
+			return Math.abs(dy) > (mOrgHeaderHeight + mOvershootDistance) - mTopView.getHeight();
 
-    private AnimatorSet smoothScrollTo(int desX, int desY, AnimatorListener listener) {
-        return smoothScrollTo(desX, desY, 300L, listener);
-    }
+		}
+	}
 
-    private AnimatorSet smoothScrollTo(int desX, int desY, long duration, AnimatorListener listener) {
-        ObjectAnimator xTranslate = ObjectAnimator.ofInt(this, "scrollX", desX);
-        ObjectAnimator yTranslate = ObjectAnimator.ofInt(this, "scrollY", desY);
+	private Animator smoothChangeHeaderHeightTo(int desHeight, AnimatorListener listener) {
+		return smoothChangeHeaderHeightTo(desHeight, 300L, listener);
+	}
 
-        yTranslate.setInterpolator(new DecelerateInterpolator());
-        yTranslate.addUpdateListener(new AnimatorUpdateListener() {
-            @Override
-            public void onAnimationUpdate(ValueAnimator animation) {
-                if (mHeaderStatusChangedListeners != null)
-                    for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-                        l.onHeaderOffsetChanged(getScrollY(), mScrollOffsetHeight,
-                                (getScrollY() * 1.0f) / mScrollOffsetHeight, mIsScrollingDown);
-                    }
+	private Animator smoothChangeHeaderHeightTo(int desHeight, long duration, AnimatorListener listener) {
+//		ObjectAnimator xTranslate = ObjectAnimator.ofInt(this, "scrollX", desX);
+//		ObjectAnimator yTranslate = ObjectAnimator.ofInt(this, "scrollY", desY);
+//
+//		yTranslate.setInterpolator(new DecelerateInterpolator());
+//		yTranslate.addUpdateListener(new AnimatorUpdateListener() {
+//			@Override
+//			public void onAnimationUpdate(ValueAnimator animation) {
+//				if (mHeaderStatusChangedListeners != null)
+//					for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+//						l.onHeaderOffsetChanged(getScrollY(), mOrgHeaderHeight,
+//								(getScrollY() * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
+//					}
+//
+//			}
+//		});
+		if (desHeight < 0) {
+			return null;
+		}
 
-            }
-        });
+		final LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(mTopView.getLayoutParams());
+		final LinearLayout.LayoutParams endParams = new LinearLayout.LayoutParams(mTopView.getLayoutParams());
+		endParams.height = desHeight;
+		ValueAnimator animator = ValueAnimator.ofObject(new TypeEvaluator<LayoutParams>() {
+			@Override
+			public LayoutParams evaluate(float fraction, LayoutParams startValue, LayoutParams endValue) {
+				LayoutParams temp = (LayoutParams) mTopView.getLayoutParams();
+				lastHeaderHeight = mTopView.getHeight();
+				temp.height = (int) (startValue.height + (endValue.height - startValue.height) * fraction);
+				return temp;
+			}
+		}, startParams, endParams);
 
-        AnimatorSet animators = new AnimatorSet();
-        animators.setDuration(duration);
-        animators.playTogether(xTranslate, yTranslate);
-        if (listener != null) animators.addListener(listener);
-        animators.start();
+		animator.setDuration(duration);
+		animator.setInterpolator(new DecelerateInterpolator());
+		animator.addUpdateListener(new AnimatorUpdateListener() {
+			@Override
+			public void onAnimationUpdate(ValueAnimator animation) {
+				LayoutParams layoutParams = (LayoutParams) animation.getAnimatedValue();
+				if (mTopView != null) {
+					mTopView.setLayoutParams(layoutParams);
+				}
+				if (mHeaderStatusChangedListeners != null) {
+					for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+						l.onHeaderOffsetChanged(mOrgHeaderHeight - layoutParams.height, mOrgHeaderHeight,
+								((mOrgHeaderHeight - layoutParams.height) * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
+					}
+				}
+			}
+		});
+		if (listener != null) animator.addListener(listener);
+		animator.start();
 
-        return animators;
-    }
+//		AnimatorSet animators = new AnimatorSet();
+//		animators.setDuration(duration);
+//		animators.playTogether(xTranslate, yTranslate);
+//		if (listener != null) animators.addListener(listener);
+//		animators.start();
 
-    @Override
-    public boolean onStartNestedScroll(View child, View target, int nestedScrollAxes) {
-        return (nestedScrollAxes & ViewCompat.SCROLL_AXIS_VERTICAL) != 0;
-    }
+		return animator;
+	}
 
-    @Override
-    public void onNestedScrollAccepted(View child, View target, int nestedScrollAxes) {
-        mParentHelper.onNestedScrollAccepted(child, target, nestedScrollAxes);
+	@Override
+	public boolean onStartNestedScroll(View child, View target, int nestedScrollAxes) {
+		return (nestedScrollAxes & ViewCompat.SCROLL_AXIS_VERTICAL) != 0;
+	}
 
-        startNestedScroll(ViewCompat.SCROLL_AXIS_VERTICAL);
-    }
+	@Override
+	public void onNestedScrollAccepted(View child, View target, int nestedScrollAxes) {
+		mParentHelper.onNestedScrollAccepted(child, target, nestedScrollAxes);
 
-    @Override
-    public void onStopNestedScroll(View target) {
-        mIsBeingDragged = false;
-        mParentHelper.onStopNestedScroll(target);
-        stopNestedScroll();
+		startNestedScroll(ViewCompat.SCROLL_AXIS_VERTICAL);
+	}
 
-        if (mOvershootDistance > 0 && getScrollY() < 0) {
-            if (mBounceBackForOvershooting != null && mBounceBackForOvershooting.isStarted()) {
-                mBounceBackForOvershooting.cancel();
-            }
-            mBounceBackForOvershooting = smoothScrollTo(0, 0, 600L, null);
-            return;
-        }
+	@Override
+	public void onStopNestedScroll(View target) {
+		mIsBeingDragged = false;
+		mParentHelper.onStopNestedScroll(target);
+		stopNestedScroll();
 
-        if (!mAutoDrawerModeEnabled || mCurHeaderStatus == EXPANDED || mCurHeaderStatus == COLLAPSED) {
-            return;
-        }
-        //Drawer adsorb effect
-        if (mIsScrollingDown) {
-            smoothScrollTo(0, 0, new AnimatorListener() {
-                @Override
-                public void onAnimationStart(Animator animation) {
+		if (mOvershootDistance > 0 && mTopView.getHeight() > mOrgHeaderHeight) {
+			if (mBounceBackForOvershooting != null && mBounceBackForOvershooting.isStarted()) {
+				mBounceBackForOvershooting.cancel();
+			}
+			mBounceBackForOvershooting = smoothChangeHeaderHeightTo(mOrgHeaderHeight, 600L, null);
+			return;
+		}
 
-                }
+		if (!mAutoDrawerModeEnabled || mCurHeaderStatus == EXPANDED || mCurHeaderStatus == COLLAPSED) {
+			return;
+		}
+		//Drawer adsorb effect
+		if (mIsScrollingDown) {
+			smoothChangeHeaderHeightTo(mOrgHeaderHeight, new AnimatorListener() {
+				@Override
+				public void onAnimationStart(Animator animation) {
 
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    if (mHeaderStatusChangedListeners != null  && mIsEnabled){
-                        for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-                            l.onHeaderExpanded();
-                        }
-                    }
+				}
 
-                    mCurHeaderStatus = EXPANDED;
-                }
+				@Override
+				public void onAnimationEnd(Animator animation) {
+					if (mHeaderStatusChangedListeners != null && mIsEnabled) {
+						for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+							l.onHeaderExpanded();
+						}
+					}
 
-                @Override
-                public void onAnimationCancel(Animator animation) {
+					mCurHeaderStatus = EXPANDED;
+				}
 
-                }
+				@Override
+				public void onAnimationCancel(Animator animation) {
 
-                @Override
-                public void onAnimationRepeat(Animator animation) {
+				}
 
-                }
-            });
-        } else {
-            smoothScrollTo(0, mScrollOffsetHeight, new AnimatorListener() {
-                @Override
-                public void onAnimationStart(Animator animation) {
+				@Override
+				public void onAnimationRepeat(Animator animation) {
 
-                }
+				}
+			});
+		} else {
+			smoothChangeHeaderHeightTo(0, new AnimatorListener() {
+				@Override
+				public void onAnimationStart(Animator animation) {
 
-                @Override
-                public void onAnimationEnd(Animator animation) {
-                    if (mHeaderStatusChangedListeners != null  && mIsEnabled){
-                        for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-                            l.onHeaderCollapsed();
-                        }
-                    }
+				}
 
-                    mCurHeaderStatus = COLLAPSED;
-                }
+				@Override
+				public void onAnimationEnd(Animator animation) {
+					if (mHeaderStatusChangedListeners != null && mIsEnabled) {
+						for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+							l.onHeaderCollapsed();
+						}
+					}
 
-                @Override
-                public void onAnimationCancel(Animator animation) {
+					mCurHeaderStatus = COLLAPSED;
+				}
 
-                }
+				@Override
+				public void onAnimationCancel(Animator animation) {
 
-                @Override
-                public void onAnimationRepeat(Animator animation) {
+				}
 
-                }
-            });
-        }
-    }
+				@Override
+				public void onAnimationRepeat(Animator animation) {
+
+				}
+			});
+		}
+	}
 
     /*
 	*  The sequence of the below callbacks should be onNestedPreScroll --> onNestedScroll --> onNestedPreFling --> onNestedFling
     *  The fling related callbacks would only be called when a fling event detected.
     */
 
-    /*
+	/*
 	*  When scrolling down and dyUnconsumed is a non-zero value, means the child has consumed part of the scrolling event,
 	*  here should expand the header.
 	*  Also see onNestedPreScroll(View target, int dx, int dy, int[] consumed)
 	*/
-    @Override
-    public void onNestedScroll(View target, int dxConsumed, int dyConsumed, int dxUnconsumed, int dyUnconsumed) {
-        unconsumedDy = dyUnconsumed;
+	@Override
+	public void onNestedScroll(View target, int dxConsumed, int dyConsumed, int dxUnconsumed, int dyUnconsumed) {
+		unconsumedDy = dyUnconsumed;
 
-        final int oldScrollY = getScrollY();
+		//final int oldScrollY = getScrollY();
+		final int headerHeight = mTopView.getHeight();
 
-        if (dyUnconsumed < 0 && oldScrollY <= 0 && mIsEnabled) //Scrolling down and header has totally expanded
-        {
-            if (mCurHeaderStatus != EXPANDED) {
-                if (mHeaderStatusChangedListeners != null  && mIsEnabled){
-                    for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-                        l.onHeaderExpanded();
-                    }
-                }
+		//if (dyUnconsumed < 0 && oldScrollY <= 0 && mIsEnabled) //Scrolling down and header has totally expanded
+		if (dyUnconsumed < 0 && headerHeight >= mOrgHeaderHeight && mIsEnabled)
+		{
+			if (mCurHeaderStatus != EXPANDED) {
+				if (mHeaderStatusChangedListeners != null) {
+					for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+						l.onHeaderExpanded();
+					}
+				}
 
-                mCurHeaderStatus = EXPANDED;
-            }
-        }
+				mCurHeaderStatus = EXPANDED;
+			}
+		}
 
-        int actualPerformedDy;
-        int actualConsumedDy;
-        boolean isReachedEdge;
+		int actualPerformedDy;
+		int actualConsumedDy;
+		boolean isReachedEdge;
 
-        if (oldScrollY > -mOvershootDistance && oldScrollY <= mScrollOffsetHeight) {
-            if (isReachedEdge = isReachedEdge(dyUnconsumed)) {
-                if (dyUnconsumed < 0) {
-                    actualPerformedDy = -(getScrollY() + mOvershootDistance);
-                } else {
-                    actualPerformedDy = mScrollOffsetHeight - getScrollY();
-                }
-                actualConsumedDy = actualPerformedDy;
-            } else {
-                if (getScrollY() <= 0) { //The layout has already been dragged to overshoot
-                    actualPerformedDy = dyUnconsumed / 3;
-                } else {
-                    actualPerformedDy = dyUnconsumed;
-                }
-                actualConsumedDy = dyUnconsumed;
-            }
-            //The value of actualConsumedDy and actualPerformedDy can be different only when in overshoot mode
-            scrollBy(0, actualPerformedDy);
+		//if (oldScrollY > -mOvershootDistance && oldScrollY <= mOrgHeaderHeight) {
+		if (headerHeight >= 0 && headerHeight < mOrgHeaderHeight + mOvershootDistance) {
+			if (isReachedEdge = isReachedEdge(dyUnconsumed)) {
+				if (dyUnconsumed < 0) {
+					//actualPerformedDy = -(getScrollY() + mOvershootDistance);
+					actualPerformedDy = -(mOrgHeaderHeight - headerHeight + mOvershootDistance);
+				} else {
+					//actualPerformedDy = mOrgHeaderHeight - getScrollY();
+					actualPerformedDy = headerHeight;
+				}
+				actualConsumedDy = actualPerformedDy;
+			} else {
+				if (headerHeight > mOrgHeaderHeight) { //The layout has already been dragged to overshoot
+					actualPerformedDy = dyUnconsumed / 2;
+				} else {
+					actualPerformedDy = dyUnconsumed;
+				}
+				actualConsumedDy = dyUnconsumed;
+			}
+			//The value of actualConsumedDy and actualPerformedDy can be different only when in overshoot mode
+			//scrollBy(0, actualPerformedDy);
+			if (actualPerformedDy != 0) {
+				final LayoutParams tempLp = (LayoutParams) mTopView.getLayoutParams();
+				lastHeaderHeight = mTopView.getHeight();
+				tempLp.height = mTopView.getHeight() - actualPerformedDy;
+				mTopView.setLayoutParams(tempLp);
+			}
 
-            if (dyUnconsumed < 0) //Scrolling down, and child has consumed part of(not all) the scrolling event
-            {
-                if (oldScrollY <= mScrollOffsetHeight * 0.88 && mIsEnabled) //Give 12% buffer height here when sending out the expanding event, for better user experience
-                {
-                    if (mHeaderStatusChangedListeners != null){
-                        for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-                            l.onHeaderOffsetChanged(getScrollY(), mScrollOffsetHeight,
-                                    (getScrollY() * 1.0f) / mScrollOffsetHeight, mIsScrollingDown);
-                        }
-                    }
+			if (dyUnconsumed < 0) //Scrolling down, and child has consumed part of(not all) the scrolling event
+			{
+				//if (oldScrollY <= mOrgHeaderHeight * 0.88 && mIsEnabled) //Give 12% buffer height here when sending out the expanding event, for better user experience
+				if (headerHeight >= mOrgHeaderHeight * 0.12 && mIsEnabled)
+				{
+					if (mHeaderStatusChangedListeners != null) {
+						for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+							l.onHeaderOffsetChanged(mOrgHeaderHeight - headerHeight, mOrgHeaderHeight,
+									((mOrgHeaderHeight - headerHeight) * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
+						}
+					}
 
-                    if (mCurHeaderStatus != EXPANDING) {
-                        if (mCurHeaderStatus == COLLAPSED) {
-                            if (mHeaderStatusChangedListeners != null){
-                                for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-                                    l.onHeaderStartExpanding();
-                                }
-                            }
+					if (mCurHeaderStatus != EXPANDING) {
+						if (mCurHeaderStatus == COLLAPSED) {
+							if (mHeaderStatusChangedListeners != null) {
+								for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+									l.onHeaderStartExpanding();
+								}
+							}
 
-                            mCurHeaderStatus = EXPANDING;
-                        }
-                    }
-                }
-            }
+							mCurHeaderStatus = EXPANDING;
+						}
+					}
+				}
+			}
 
-            int myConsumed = isReachedEdge ? actualConsumedDy : getScrollY() - oldScrollY;
-            int myUnconsumed = dyUnconsumed - myConsumed;
+			//int myConsumed = isReachedEdge ? actualConsumedDy : getScrollY() - oldScrollY;
+			int myConsumed = isReachedEdge ? actualConsumedDy : headerHeight - mTopView.getHeight();
+			int myUnconsumed = dyUnconsumed - myConsumed;
 
-            dispatchNestedScroll(0, myConsumed, 0, myUnconsumed, null);
-        }
-    }
+			dispatchNestedScroll(0, myConsumed, 0, myUnconsumed, null);
+		}
+	}
 
-    /*
+	/*
 	*  When scrolling up, first intercept the scrolling event to collapse the header, then give the event back to its child
 	*  When scrolling down, let the child consume the scrolling first
 	*  Also see onNestedScroll(View target, int dxConsumed, int dyConsumed, int dxUnconsumed, int dyUnconsumed)
 	*/
-    @Override
-    public void onNestedPreScroll(View target, int dx, int dy, int[] consumed) {
-        if (Math.abs(dy) > 3) { //A slop was given to avoid mistake counting for scrolling direction
-            mIsScrollingDown = (dy < 0);
-            mIsBeingDragged = true;
-        }
-        if (!dispatchNestedPreScroll(dx, dy, consumed, null)) {
-            if (!shouldConsumeNestedScroll(dy)) return;
+	@Override
+	public void onNestedPreScroll(View target, int dx, int dy, int[] consumed) {
+		if (mIsScrollingDown && mIsBeingDragged) {
+			//The body layout height is dynamically changing, and as well as the return of getY() which is a relative value.
+			//And thus it will lead to wrong calculation of dy.
+			// Here we make a manually adjust for dy value to correct the wrong dy caused by the changing of body height.
+			dy -= Math.abs(lastHeaderHeight - mTopView.getHeight());
+		}
+		if (Math.abs(dy) > 3) { //A slop was given to avoid mistake counting for scrolling direction
+			mIsScrollingDown = (dy < 0);
+			mIsBeingDragged = true;
+		}
+		if (!dispatchNestedPreScroll(dx, dy, consumed, null)) {
+			if (!shouldConsumeNestedScroll(dy)) return;
 
-            if (mBounceBackForOvershooting != null && mBounceBackForOvershooting.isStarted()) {
-                mBounceBackForOvershooting.cancel();
-            }
+			if (mBounceBackForOvershooting != null && mBounceBackForOvershooting.isStarted()) {
+				mBounceBackForOvershooting.cancel();
+			}
 
-            if (dy < 0) return;   //Scrolling down event would not be handled here
+			if (dy < 0) return;   //Scrolling down event would not be handled here
 
-            if (mCurHeaderStatus != COLLAPSING) {
-                if (getScrollY() >= -mOvershootDistance && getScrollY() < mScrollOffsetHeight && mIsEnabled) {
-                    if (mHeaderStatusChangedListeners != null){
-                        for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-                            l.onHeaderStartCollapsing();
-                        }
-                    }
+			final int headerHeight = mTopView.getHeight();
 
-                    mCurHeaderStatus = COLLAPSING;
-                }
-            }
+			if (mCurHeaderStatus != COLLAPSING) {
+				//if (getScrollY() >= -mOvershootDistance && getScrollY() < mOrgHeaderHeight && mIsEnabled) {
+				if (headerHeight > 0 && headerHeight < (mOrgHeaderHeight + mOvershootDistance) && mIsEnabled) {
+					if (mHeaderStatusChangedListeners != null) {
+						for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+							l.onHeaderStartCollapsing();
+						}
+					}
 
-            int actualPerformedDy;
+					mCurHeaderStatus = COLLAPSING;
+				}
+			}
 
-            if (isReachedEdge(dy)) {
-                if (dy < 0)
-                    actualPerformedDy = getScrollY();
-                else
-                    actualPerformedDy = mScrollOffsetHeight - getScrollY();
-            } else {
-                actualPerformedDy = dy;
-            }
+			int actualPerformedDy;
 
-            scrollBy(0, actualPerformedDy);
+			if (isReachedEdge(dy)) {
+				actualPerformedDy = headerHeight;
 
-            if (mHeaderStatusChangedListeners != null  && mIsEnabled){
-                for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-                    l.onHeaderOffsetChanged(getScrollY(), mScrollOffsetHeight,
-                            (getScrollY() * 1.0f) / mScrollOffsetHeight, mIsScrollingDown);
-                }
-            }
+			} else {
+				actualPerformedDy = dy;
+			}
+
+			//scrollBy(0, actualPerformedDy);
+			if (actualPerformedDy != 0) {
+				final LayoutParams tempLp = (LayoutParams) mTopView.getLayoutParams();
+				lastHeaderHeight = mTopView.getHeight();
+				tempLp.height = mTopView.getHeight() - actualPerformedDy;
+				mTopView.setLayoutParams(tempLp);
+			}
+
+			if (mHeaderStatusChangedListeners != null && mIsEnabled) {
+				for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+					l.onHeaderOffsetChanged(mOrgHeaderHeight - headerHeight, mOrgHeaderHeight,
+							((mOrgHeaderHeight - headerHeight) * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
+				}
+			}
 
 
-            if (dy > 0 && getScrollY() >= mScrollOffsetHeight && mIsEnabled) {
-                if (mCurHeaderStatus != COLLAPSED) {
-                    if (mHeaderStatusChangedListeners != null) {
-                        for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-                            l.onHeaderCollapsed();
-                        }
-                    }
+			//if (dy > 0 && getScrollY() >= mOrgHeaderHeight && mIsEnabled) {
+			if (dy >= 0 && mTopView.getHeight() == 0 && mIsEnabled) {
+				if (mCurHeaderStatus != COLLAPSED) {
+					if (mHeaderStatusChangedListeners != null) {
+						for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+							l.onHeaderCollapsed();
+						}
+					}
 
-                    mCurHeaderStatus = COLLAPSED;
-                }
-            }
+					mCurHeaderStatus = COLLAPSED;
+				}
+			}
 
-            consumed[0] = 0;
-            consumed[1] = dy;
-        }
-    }
+			consumed[0] = 0;
+			consumed[1] = dy;
+		}
+	}
 
-    @Override
-    public boolean onNestedFling(View target, float velocityX, float velocityY, boolean consumed) {
-        return !consumed;
-    }
+	@Override
+	public boolean onNestedFling(View target, float velocityX, float velocityY, boolean consumed) {
+		return !consumed;
+	}
 
-    private float lastVelocityY = -0.1f;
-    private int unconsumedDy;
+	private float lastVelocityY = -0.1f;
+	private int unconsumedDy;
 
-    /*
+	/*
 	*  When fling up and last-time fling was down side, smoothly collapse the header.
 	*/
-    @Override
-    public boolean onNestedPreFling(View target, float velocityX, float velocityY) {
-        if (mSupportFlingAction) {
-            if (velocityY > 0 && lastVelocityY < 0) {
-                if (mCurHeaderStatus != COLLAPSED) {
-                    //Smoothly collapsing the header
-                    smoothScrollTo(0, mScrollOffsetHeight, new AnimatorListener() {
-                        @Override
-                        public void onAnimationStart(Animator animation) {
-                            mCurHeaderStatus = COLLAPSING;
-                        }
+	@Override
+	public boolean onNestedPreFling(View target, float velocityX, float velocityY) {
+		if (mSupportFlingAction) {
+			if (velocityY > 0 && lastVelocityY < 0) {
+				if (mCurHeaderStatus != COLLAPSED) {
+					//Smoothly collapsing the header
+					smoothChangeHeaderHeightTo(0, new AnimatorListener() {
+						@Override
+						public void onAnimationStart(Animator animation) {
+							mCurHeaderStatus = COLLAPSING;
+						}
 
-                        @Override
-                        public void onAnimationEnd(Animator animation) {
-                            if (mHeaderStatusChangedListeners != null && mIsEnabled) {
-                                for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-                                    l.onHeaderCollapsed();
-                                }
-                            }
+						@Override
+						public void onAnimationEnd(Animator animation) {
+							if (mHeaderStatusChangedListeners != null && mIsEnabled) {
+								for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+									l.onHeaderCollapsed();
+								}
+							}
 
-                            mCurHeaderStatus = COLLAPSED;
-                        }
+							mCurHeaderStatus = COLLAPSED;
+						}
 
-                        @Override
-                        public void onAnimationCancel(Animator animation) {
+						@Override
+						public void onAnimationCancel(Animator animation) {
 
-                        }
+						}
 
-                        @Override
-                        public void onAnimationRepeat(Animator animation) {
+						@Override
+						public void onAnimationRepeat(Animator animation) {
 
-                        }
-                    });
-                }
+						}
+					});
+				}
 
-                lastVelocityY = velocityY;
+				lastVelocityY = velocityY;
 
-                return true;
-            } else if (velocityY < 0 && unconsumedDy < 0) //Fling down and has unconsumed vertical value, should handle this fling
-            {
-                if (mCurHeaderStatus != EXPANDED) {
-                    //Smoothly expanding the header, related callbacks would be called in onNestedScroll
-                    smoothScrollTo(0, 0, new AnimatorListener() {
-                        @Override
-                        public void onAnimationStart(Animator animation) {
-                            mCurHeaderStatus = EXPANDING;
-                        }
+				return true;
+			} else if (velocityY < 0 && unconsumedDy < 0) //Fling down and has unconsumed vertical value, should handle this fling
+			{
+				if (mCurHeaderStatus != EXPANDED) {
+					//Smoothly expanding the header, related callbacks would be called in onNestedScroll
+					smoothChangeHeaderHeightTo(mOrgHeaderHeight, new AnimatorListener() {
+						@Override
+						public void onAnimationStart(Animator animation) {
+							mCurHeaderStatus = EXPANDING;
+						}
 
-                        @Override
-                        public void onAnimationEnd(Animator animation) {
-                            if (mHeaderStatusChangedListeners != null && mIsEnabled) {
-                                for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-                                    l.onHeaderExpanded();
-                                }
-                            }
+						@Override
+						public void onAnimationEnd(Animator animation) {
+							if (mHeaderStatusChangedListeners != null && mIsEnabled) {
+								for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+									l.onHeaderExpanded();
+								}
+							}
 
-                            mCurHeaderStatus = EXPANDED;
-                        }
+							mCurHeaderStatus = EXPANDED;
+						}
 
-                        @Override
-                        public void onAnimationCancel(Animator animation) {
+						@Override
+						public void onAnimationCancel(Animator animation) {
 
-                        }
+						}
 
-                        @Override
-                        public void onAnimationRepeat(Animator animation) {
+						@Override
+						public void onAnimationRepeat(Animator animation) {
 
-                        }
-                    });
-                }
-            }
-        }
+						}
+					});
+				}
+			}
+		}
 
-        lastVelocityY = velocityY;
+		lastVelocityY = velocityY;
 
-        return dispatchNestedPreFling(velocityX, velocityY);
-    }
+		return dispatchNestedPreFling(velocityX, velocityY);
+	}
 
-    @Override
-    public int getNestedScrollAxes() {
-        return mParentHelper.getNestedScrollAxes();
-    }
+	@Override
+	public int getNestedScrollAxes() {
+		return mParentHelper.getNestedScrollAxes();
+	}
 
-    public interface OnViewFinishInflateListener {
-        void onViewFinishInflate();
-    }
+	public interface OnViewFinishInflateListener {
+		void onViewFinishInflate();
+	}
 }
