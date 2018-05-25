@@ -645,7 +645,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 				actualConsumedDy = actualPerformedDy;
 			} else {
 				if (headerHeight > mOrgHeaderHeight) { //The layout has already been dragged to overshoot
-					actualPerformedDy = dyUnconsumed / 2;
+					actualPerformedDy = dyUnconsumed / 3;
 				} else {
 					actualPerformedDy = dyUnconsumed;
 				}
@@ -701,24 +701,30 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 	*/
 	@Override
 	public void onNestedPreScroll(View target, int dx, int dy, int[] consumed) {
+		int fixedDy = dy;
 		if (mIsScrollingDown && mIsBeingDragged) {
 			//The body layout height is dynamically changing, and as well as the return of getY() which is a relative value.
 			//And thus it will lead to wrong calculation of dy.
 			// Here we make a manually adjust for dy value to correct the wrong dy caused by the changing of body height.
-			dy -= Math.abs(lastHeaderHeight - mTopView.getHeight());
+			fixedDy = dy < 0 ? dy : dy - Math.abs(lastHeaderHeight - mTopView.getHeight());
 		}
-		if (Math.abs(dy) > 3) { //A slop was given to avoid mistake counting for scrolling direction
-			mIsScrollingDown = (dy < 0);
+		if (Math.abs(fixedDy) > 3) { //A slop was given to avoid mistake counting for scrolling direction
+			mIsScrollingDown = (fixedDy < 0);
 			mIsBeingDragged = true;
 		}
 		if (!dispatchNestedPreScroll(dx, dy, consumed, null)) {
-			if (!shouldConsumeNestedScroll(dy)) return;
+			if (!shouldConsumeNestedScroll(fixedDy)) return;
 
 			if (mBounceBackForOvershooting != null && mBounceBackForOvershooting.isStarted()) {
 				mBounceBackForOvershooting.cancel();
 			}
 
-			if (dy < 0) return;   //Scrolling down event would not be handled here
+			if (fixedDy < 0) {
+				if (fixedDy != dy) {
+					onNestedScroll(this, 0, 0, 0, fixedDy);
+				}
+				return;   //Scrolling down event would not be handled here
+			}
 
 			final int headerHeight = mTopView.getHeight();
 
@@ -737,11 +743,11 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 
 			int actualPerformedDy;
 
-			if (isReachedEdge(dy)) {
+			if (isReachedEdge(fixedDy)) {
 				actualPerformedDy = headerHeight;
 
 			} else {
-				actualPerformedDy = dy;
+				actualPerformedDy = fixedDy;
 			}
 
 			//scrollBy(0, actualPerformedDy);
