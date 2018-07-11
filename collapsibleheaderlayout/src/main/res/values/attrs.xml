@@ -12,6 +12,7 @@
         <attr name="overlayFooterLayoutId" format="reference" />
         <attr name="supportFlingAction" format="boolean" />
         <attr name="autoDrawerModeEnabled" format="boolean" />
+        <attr name="defaultExpand" format="boolean" />
         <attr name="overshootDistance" format="integer" />
 
     </declare-styleable>
