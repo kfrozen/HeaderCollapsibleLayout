@@ -43,6 +43,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 	private Context mContext;
 	private OnViewFinishInflateListener mViewFinishInflateListener;
 	private List<OnHeaderStatusChangedListener> mHeaderStatusChangedListeners;
+	private OnHeaderStatusChangedListener mSingleHeaderStatusChangedListener;
 	private int mOrgHeaderHeight = -1;
 	private int mOrgHeaderHeightBackup = -1;
 	private int mOverlayFooterLayoutId = -1;
@@ -223,6 +224,19 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 	/*********
 	 * Public methods starts
 	 ****************/
+	@Deprecated
+	public void setOnHeaderStatusChangedListener(OnHeaderStatusChangedListener callback)
+	{
+		this.mSingleHeaderStatusChangedListener = callback;
+	}
+
+	@Deprecated
+	public void removeOnHeaderStatusChangedListener()
+	{
+		this.mSingleHeaderStatusChangedListener = null;
+	}
+
+
 	public void addOnHeaderStatusChangedListener(OnHeaderStatusChangedListener callback) {
 		if (mHeaderStatusChangedListeners == null) {
 			mHeaderStatusChangedListeners = new ArrayList<>();
@@ -277,6 +291,10 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 					}
 				}
 
+				if (mSingleHeaderStatusChangedListener != null) {
+					mSingleHeaderStatusChangedListener.onHeaderStartCollapsing();
+				}
+
 			}
 
 			@Override
@@ -287,6 +305,10 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 					for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
 						l.onHeaderCollapsed();
 					}
+				}
+
+				if (mSingleHeaderStatusChangedListener != null) {
+					mSingleHeaderStatusChangedListener.onHeaderCollapsed();
 				}
 			}
 
@@ -327,6 +349,10 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 						l.onHeaderStartExpanding();
 					}
 				}
+
+				if (mSingleHeaderStatusChangedListener != null) {
+					mSingleHeaderStatusChangedListener.onHeaderStartExpanding();
+				}
 			}
 
 			@Override
@@ -337,6 +363,10 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 					for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
 						l.onHeaderExpanded();
 					}
+				}
+
+				if (mSingleHeaderStatusChangedListener != null) {
+					mSingleHeaderStatusChangedListener.onHeaderExpanded();
 				}
 			}
 
@@ -520,6 +550,11 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 								((mOrgHeaderHeight - layoutParams.height) * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
 					}
 				}
+
+				if (mSingleHeaderStatusChangedListener != null) {
+					mSingleHeaderStatusChangedListener.onHeaderOffsetChanged(mOrgHeaderHeight - layoutParams.height, mOrgHeaderHeight,
+							((mOrgHeaderHeight - layoutParams.height) * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
+				}
 			}
 		});
 		if (listener != null) animator.addListener(listener);
@@ -578,9 +613,15 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 
 				@Override
 				public void onAnimationEnd(Animator animation) {
-					if (mHeaderStatusChangedListeners != null && mIsEnabled) {
-						for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-							l.onHeaderExpanded();
+					if (mIsEnabled) {
+						if (mHeaderStatusChangedListeners != null) {
+							for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+								l.onHeaderExpanded();
+							}
+						}
+
+						if (mSingleHeaderStatusChangedListener != null) {
+							mSingleHeaderStatusChangedListener.onHeaderExpanded();
 						}
 					}
 
@@ -606,9 +647,15 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 
 				@Override
 				public void onAnimationEnd(Animator animation) {
-					if (mHeaderStatusChangedListeners != null && mIsEnabled) {
-						for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-							l.onHeaderCollapsed();
+					if (mIsEnabled) {
+						if (mHeaderStatusChangedListeners != null) {
+							for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+								l.onHeaderCollapsed();
+							}
+						}
+
+						if (mSingleHeaderStatusChangedListener != null) {
+							mSingleHeaderStatusChangedListener.onHeaderCollapsed();
 						}
 					}
 
@@ -667,6 +714,10 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 					}
 				}
 
+				if (mSingleHeaderStatusChangedListener != null) {
+					mSingleHeaderStatusChangedListener.onHeaderExpanded();
+				}
+
 				mCurHeaderStatus = EXPANDED;
 			}
 		}
@@ -709,12 +760,21 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 					}
 				}
 
+				if (mSingleHeaderStatusChangedListener != null) {
+					mSingleHeaderStatusChangedListener.onHeaderOffsetChanged(mOrgHeaderHeight - headerHeight, mOrgHeaderHeight,
+							((mOrgHeaderHeight - headerHeight) * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
+				}
+
 				if (mCurHeaderStatus != EXPANDING) {
 					if (mCurHeaderStatus == COLLAPSED) {
 						if (mHeaderStatusChangedListeners != null) {
 							for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
 								l.onHeaderStartExpanding();
 							}
+						}
+
+						if (mSingleHeaderStatusChangedListener != null) {
+							mSingleHeaderStatusChangedListener.onHeaderStartExpanding();
 						}
 
 						mCurHeaderStatus = EXPANDING;
@@ -777,6 +837,10 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 						}
 					}
 
+					if (mSingleHeaderStatusChangedListener != null) {
+						mSingleHeaderStatusChangedListener.onHeaderStartCollapsing();
+					}
+
 					mCurHeaderStatus = COLLAPSING;
 				}
 			}
@@ -798,13 +862,19 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 				mTopView.setLayoutParams(tempLp);
 			}
 
-			if (mHeaderStatusChangedListeners != null && mIsEnabled) {
-				for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-					l.onHeaderOffsetChanged(mOrgHeaderHeight - headerHeight, mOrgHeaderHeight,
+			if (mIsEnabled) {
+				if (mHeaderStatusChangedListeners != null) {
+					for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+						l.onHeaderOffsetChanged(mOrgHeaderHeight - headerHeight, mOrgHeaderHeight,
+								((mOrgHeaderHeight - headerHeight) * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
+					}
+				}
+
+				if (mSingleHeaderStatusChangedListener != null) {
+					mSingleHeaderStatusChangedListener.onHeaderOffsetChanged(mOrgHeaderHeight - headerHeight, mOrgHeaderHeight,
 							((mOrgHeaderHeight - headerHeight) * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
 				}
 			}
-
 
 			//if (dy > 0 && getScrollY() >= mOrgHeaderHeight && mIsEnabled) {
 			if (mTopView.getHeight() == 0 && mIsEnabled) {
@@ -813,6 +883,10 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 						for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
 							l.onHeaderCollapsed();
 						}
+					}
+
+					if (mSingleHeaderStatusChangedListener != null) {
+						mSingleHeaderStatusChangedListener.onHeaderCollapsed();
 					}
 
 					mCurHeaderStatus = COLLAPSED;
@@ -849,9 +923,15 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 
 						@Override
 						public void onAnimationEnd(Animator animation) {
-							if (mHeaderStatusChangedListeners != null && mIsEnabled) {
-								for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-									l.onHeaderCollapsed();
+							if (mIsEnabled) {
+								if (mHeaderStatusChangedListeners != null) {
+									for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+										l.onHeaderCollapsed();
+									}
+								}
+
+								if (mSingleHeaderStatusChangedListener != null) {
+									mSingleHeaderStatusChangedListener.onHeaderCollapsed();
 								}
 							}
 
@@ -885,9 +965,15 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 
 						@Override
 						public void onAnimationEnd(Animator animation) {
-							if (mHeaderStatusChangedListeners != null && mIsEnabled) {
-								for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-									l.onHeaderExpanded();
+							if (mIsEnabled) {
+								if (mHeaderStatusChangedListeners != null) {
+									for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+										l.onHeaderExpanded();
+									}
+								}
+
+								if (mSingleHeaderStatusChangedListener != null) {
+									mSingleHeaderStatusChangedListener.onHeaderExpanded();
 								}
 							}
 
