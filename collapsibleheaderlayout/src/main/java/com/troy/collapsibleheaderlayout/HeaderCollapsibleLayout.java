@@ -688,24 +688,12 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 	@Override
 	public void onNestedScroll(View target, int dxConsumed, int dyConsumed, int dxUnconsumed, int dyUnconsumed) {
 		unconsumedDy = dyUnconsumed;
-		int fixedDy = dyUnconsumed;
-		if (mIsBeingDragged) {
-			//The body layout height is dynamically changing, and as well as the return of getY() which is a relative value.
-			//And thus it will lead to wrong calculation of dy.
-			// Here we make a manually adjust for dy value to correct the wrong dy caused by the changing of body height.
-			fixedDy = dyUnconsumed < 0 ? dyUnconsumed : (fixedDy - Math.abs(mTopView.getHeight() - lastHeaderHeight));
-		}
-
-		if (fixedDy >= 0) {
-			dispatchNestedScroll(0, dyConsumed, 0, dyUnconsumed, null);
-			return;
-		}
 
 		//final int oldScrollY = getScrollY();
 		final int headerHeight = mTopView.getHeight();
 
 		//if (dyUnconsumed < 0 && oldScrollY <= 0 && mIsEnabled) //Scrolling down and header has totally expanded
-		if (headerHeight >= mOrgHeaderHeight && mIsEnabled)
+		if (dyUnconsumed < 0 && headerHeight >= mOrgHeaderHeight && mIsEnabled)
 		{
 			if (mCurHeaderStatus != EXPANDED) {
 				if (mHeaderStatusChangedListeners != null) {
@@ -727,18 +715,23 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 		boolean isReachedEdge;
 
 		//if (oldScrollY > -mOvershootDistance && oldScrollY <= mOrgHeaderHeight) {
-		if (headerHeight >= 0 && mOrgHeaderHeight > 0 && headerHeight < mOrgHeaderHeight + mOvershootDistance) {
-			if (isReachedEdge = isReachedEdge(fixedDy)) {
-				//actualPerformedDy = -(getScrollY() + mOvershootDistance);
-				actualPerformedDy = -(mOrgHeaderHeight - headerHeight + mOvershootDistance);
+		if (headerHeight >= 0 && headerHeight < mOrgHeaderHeight + mOvershootDistance) {
+			if (isReachedEdge = isReachedEdge(dyUnconsumed)) {
+				if (dyUnconsumed < 0) {
+					//actualPerformedDy = -(getScrollY() + mOvershootDistance);
+					actualPerformedDy = -(mOrgHeaderHeight - headerHeight + mOvershootDistance);
+				} else {
+					//actualPerformedDy = mOrgHeaderHeight - getScrollY();
+					actualPerformedDy = headerHeight;
+				}
 				actualConsumedDy = actualPerformedDy;
 			} else {
 				if (headerHeight > mOrgHeaderHeight) { //The layout has already been dragged to overshoot
-					actualPerformedDy = fixedDy / 3;
+					actualPerformedDy = dyUnconsumed / 3;
 				} else {
-					actualPerformedDy = fixedDy;
+					actualPerformedDy = dyUnconsumed;
 				}
-				actualConsumedDy = fixedDy;
+				actualConsumedDy = dyUnconsumed;
 			}
 			//The value of actualConsumedDy and actualPerformedDy can be different only when in overshoot mode
 			//scrollBy(0, actualPerformedDy);
@@ -749,35 +742,36 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 				mTopView.setLayoutParams(tempLp);
 			}
 
-			//Scrolling down, and child has consumed part of(not all) the scrolling event
-			//if (oldScrollY <= mOrgHeaderHeight * 0.88 && mIsEnabled) //Give 12% buffer height here when sending out the expanding event, for better user experience
-			if (headerHeight >= mOrgHeaderHeight * 0.12 && mIsEnabled)
+			if (dyUnconsumed < 0) //Scrolling down, and child has consumed part of(not all) the scrolling event
 			{
-				if (mHeaderStatusChangedListeners != null) {
-					for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-						l.onHeaderOffsetChanged(mOrgHeaderHeight - headerHeight, mOrgHeaderHeight,
+				//if (oldScrollY <= mOrgHeaderHeight * 0.88 && mIsEnabled) //Give 12% buffer height here when sending out the expanding event, for better user experience
+				if (headerHeight >= mOrgHeaderHeight * 0.12 && mIsEnabled) {
+					if (mHeaderStatusChangedListeners != null) {
+						for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+							l.onHeaderOffsetChanged(mOrgHeaderHeight - headerHeight, mOrgHeaderHeight,
+									((mOrgHeaderHeight - headerHeight) * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
+						}
+					}
+
+					if (mSingleHeaderStatusChangedListener != null) {
+						mSingleHeaderStatusChangedListener.onHeaderOffsetChanged(mOrgHeaderHeight - headerHeight, mOrgHeaderHeight,
 								((mOrgHeaderHeight - headerHeight) * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
 					}
-				}
 
-				if (mSingleHeaderStatusChangedListener != null) {
-					mSingleHeaderStatusChangedListener.onHeaderOffsetChanged(mOrgHeaderHeight - headerHeight, mOrgHeaderHeight,
-							((mOrgHeaderHeight - headerHeight) * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
-				}
-
-				if (mCurHeaderStatus != EXPANDING) {
-					if (mCurHeaderStatus == COLLAPSED) {
-						if (mHeaderStatusChangedListeners != null) {
-							for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
-								l.onHeaderStartExpanding();
+					if (mCurHeaderStatus != EXPANDING) {
+						if (mCurHeaderStatus == COLLAPSED) {
+							if (mHeaderStatusChangedListeners != null) {
+								for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
+									l.onHeaderStartExpanding();
+								}
 							}
-						}
 
-						if (mSingleHeaderStatusChangedListener != null) {
-							mSingleHeaderStatusChangedListener.onHeaderStartExpanding();
-						}
+							if (mSingleHeaderStatusChangedListener != null) {
+								mSingleHeaderStatusChangedListener.onHeaderStartExpanding();
+							}
 
-						mCurHeaderStatus = EXPANDING;
+							mCurHeaderStatus = EXPANDING;
+						}
 					}
 				}
 			}
@@ -788,7 +782,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 
 			dispatchNestedScroll(0, myConsumed, 0, myUnconsumed, null);
 		} else if (mOrgHeaderHeight == 0 && mOvershootDistance > 0 && getScrollY() > -mOvershootDistance) {
-			actualPerformedDy = fixedDy / 3;
+			actualPerformedDy = dyUnconsumed / 3;
 			scrollBy(0, actualPerformedDy);
 			dispatchNestedScroll(0, actualPerformedDy, 0, dyUnconsumed - actualPerformedDy, null);
 		}
@@ -802,12 +796,11 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 	@Override
 	public void onNestedPreScroll(View target, int dx, int dy, int[] consumed) {
 		int fixedDy = dy;
-		if (mIsBeingDragged) {
+		if (mIsScrollingDown && mIsBeingDragged) {
 			//The body layout height is dynamically changing, and as well as the return of getY() which is a relative value.
 			//And thus it will lead to wrong calculation of dy.
 			// Here we make a manually adjust for dy value to correct the wrong dy caused by the changing of body height.
-			fixedDy = mIsScrollingDown ? (dy < 0 ? dy : dy - Math.abs(mTopView.getHeight() - lastHeaderHeight))
-					: (dy > 0 ? dy : dy + Math.abs(mTopView.getHeight() - lastHeaderHeight));
+			fixedDy = dy < 0 ? dy : dy - Math.abs(lastHeaderHeight - mTopView.getHeight());
 		}
 		if (Math.abs(fixedDy) > 3) {
 			mIsScrollingDown = (fixedDy < 0);

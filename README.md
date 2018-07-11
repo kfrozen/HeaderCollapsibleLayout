@@ -7,7 +7,7 @@ A wrapper layout that can easily split your current layout into header and body,
 
 ## Usage ##
 	dependencies {
-	    compile 'com.troy.collapsibleheaderlayout:collapsibleheaderlayout:2.0.1'
+	    compile 'com.troy.collapsibleheaderlayout:collapsibleheaderlayout:2.0.2'
 	}
 
 ## Basic steps to wrap your original layout to obtain a collapsible header layout##
@@ -30,7 +30,7 @@ A wrapper layout that can easily split your current layout into header and body,
 
 3. You are all set! Ready to soar ---
 
-**WHAT'S NEW IN 2.0.1:**
+**WHAT'S NEW IN 2.0.X:**
 
 1. Support **overscroll** action. When the header view has been expanded, if user kept scrolling down, the header view would be stretched to response to the overscroll action, and then bounce back when user released.
 To enable the overscroll effect, just give a positive integer to the attribute **app:overshootDistance**, which means the max overscroll distance in pixel.
