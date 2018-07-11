@@ -2,7 +2,7 @@
 A wrapper layout that can easily split your current layout into header and body, and provides smooth header collapsing action with related event callbacks.
 
 ## Demo ##
-![](https://github.com/kfrozen/HeaderCollapsibleLayout/raw/master/logo/HCLayoutDemo.gif)
+![](https://github.com/kfrozen/HeaderCollapsibleLayout/raw/master/logo/HCLayoutGif.gif)
 
 
 ## Usage ##
