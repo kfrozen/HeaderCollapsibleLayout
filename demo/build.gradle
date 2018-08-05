@@ -25,8 +25,8 @@ dependencies {
     implementation "com.android.support:appcompat-v7:${libs.androidSupport}"
     implementation "com.android.support:recyclerview-v7:${libs.androidSupport}"
 
-    androidTestImplementation('com.android.support.test.espresso:espresso-core:2.2.2', {
+    androidTestImplementation("com.android.support.test.espresso:espresso-core:${libs.espresso}", {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
-    testImplementation 'junit:junit:4.12'
+    testImplementation "junit:junit:${libs.junit}"
 }
