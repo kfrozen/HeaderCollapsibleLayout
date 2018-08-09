@@ -9,8 +9,10 @@ import android.animation.ValueAnimator.AnimatorUpdateListener;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.os.Build;
+import android.os.Looper;
 import android.support.annotation.IntDef;
 import android.support.annotation.Nullable;
+import android.support.annotation.UiThread;
 import android.support.v4.view.NestedScrollingChild;
 import android.support.v4.view.NestedScrollingChildHelper;
 import android.support.v4.view.NestedScrollingParent;
@@ -60,8 +62,6 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
      * Collapse status - stay expanded idle
      */
     public static final int EXPANDED = 4;
-
-    private static final Object S_LOCK = HeaderCollapsibleLayout.class;
 
     protected boolean mIsEnabled = true;
     protected boolean mIsScrollingDown;
@@ -307,16 +307,25 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
         mSingleHeaderStatusChangedListener = null;
     }
 
+    /**
+     * Add header status observe listener.
+     *
+     * @param callback header status changed observer
+     * @throws IllegalStateException Call this on work thread
+     */
+    @UiThread
     public void addOnHeaderStatusChangedListener(OnHeaderStatusChangedListener callback) {
-        synchronized (S_LOCK) {
-            if (mHeaderStatusChangedListeners == null) {
-                mHeaderStatusChangedListeners = new ArrayList<>();
-            }
-            if (mHeaderStatusChangedListeners.contains(callback)) {
-                return;
-            }
-            mHeaderStatusChangedListeners.add(callback);
+        if (Thread.currentThread() != Looper.getMainLooper().getThread()) {
+            throw new IllegalStateException("Should call this method on UiThread only.");
         }
+
+        if (mHeaderStatusChangedListeners == null) {
+            mHeaderStatusChangedListeners = new ArrayList<>();
+        }
+        if (mHeaderStatusChangedListeners.contains(callback)) {
+            return;
+        }
+        mHeaderStatusChangedListeners.add(callback);
     }
 
     public void removeOnHeaderStatusChangedListener(OnHeaderStatusChangedListener listener) {
