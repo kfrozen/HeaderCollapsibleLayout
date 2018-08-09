@@ -1,20 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout
-        xmlns:android="http://schemas.android.com/apk/res/android"
-        xmlns:tools="http://schemas.android.com/tools"
-        xmlns:app="http://schemas.android.com/apk/res-auto"
-        android:id="@+id/activity_main"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        tools:context="com.troy.demo.MainActivity">
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/activity_main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.troy.demo.MainActivity">
 
     <com.troy.collapsibleheaderlayout.HeaderCollapsibleLayout
-            android:id="@+id/default_header_collapsible_layout_id"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            app:topPanelLayoutId="@layout/comp_collapsible_layout_header"
-            app:bottomPanelLayoutId="@layout/comp_collapsible_layout_body"
-            app:overshootDistance="5000"/>
-            <!--app:supportAutoExpand="false" />-->
+        android:id="@+id/default_header_collapsible_layout_id"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:overshootDistance="5000">
+        <!--app:supportAutoExpand="false" />-->
+
+        <include layout="@layout/comp_collapsible_layout_header" />
+
+        <include layout="@layout/comp_collapsible_layout_body" />
+    </com.troy.collapsibleheaderlayout.HeaderCollapsibleLayout>
 
 </FrameLayout>
