@@ -75,7 +75,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
     private OnHeaderStatusChangedListener mSingleHeaderStatusChangedListener;
     private int mOrgHeaderHeight = -1;
     private int mOrgHeaderHeightBackup = -1;
-    private int mOverlayFooterLayoutId = -1;
+    private int mOverlayFooterId = -1;
     private int mOvershootDistance;
     private boolean mSupportFlingAction;
     private boolean mAutoDrawerModeEnabled = true;
@@ -175,8 +175,8 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
             getHeight();
         }
 
-        if (mOverlayFooterLayoutId != -1) {
-            View overlayFooter = mTopView.findViewById(mOverlayFooterLayoutId);
+        if (mOverlayFooterId != -1) {
+            View overlayFooter = mTopView.findViewById(mOverlayFooterId);
 
             if (overlayFooter != null) {
                 mOrgHeaderHeight = mOrgHeaderHeight - overlayFooter.getMeasuredHeight();
@@ -256,22 +256,22 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 
         final TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.HeaderCollapsibleLayout, 0, 0);
 
-        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_topPanelLayoutId)) {
-            int headerLayout = a.getResourceId(R.styleable.HeaderCollapsibleLayout_topPanelLayoutId, -1);
+        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_topPanelLayout)) {
+            int headerLayout = a.getResourceId(R.styleable.HeaderCollapsibleLayout_topPanelLayout, -1);
             if (headerLayout != -1) {
                 mTopView = (ViewGroup) LayoutInflater.from(mContext).inflate(headerLayout, this, false);
             }
         }
 
-        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_bottomPanelLayoutId)) {
-            int bodyLayout = a.getResourceId(R.styleable.HeaderCollapsibleLayout_bottomPanelLayoutId, -1);
+        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_bottomPanelLayout)) {
+            int bodyLayout = a.getResourceId(R.styleable.HeaderCollapsibleLayout_bottomPanelLayout, -1);
             if (bodyLayout != -1) {
                 mBottomView = (ViewGroup) LayoutInflater.from(mContext).inflate(bodyLayout, this, false);
             }
         }
 
-        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_overlayFooterLayoutId)) {
-            mOverlayFooterLayoutId = a.getResourceId(R.styleable.HeaderCollapsibleLayout_overlayFooterLayoutId, -1);
+        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_overlayFooterId)) {
+            mOverlayFooterId = a.getResourceId(R.styleable.HeaderCollapsibleLayout_overlayFooterId, -1);
         }
 
         if (a.hasValue(R.styleable.HeaderCollapsibleLayout_supportFlingAction)) {
