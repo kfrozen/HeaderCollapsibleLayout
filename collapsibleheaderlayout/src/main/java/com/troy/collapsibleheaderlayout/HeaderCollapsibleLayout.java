@@ -8,8 +8,11 @@ import android.animation.ValueAnimator;
 import android.animation.ValueAnimator.AnimatorUpdateListener;
 import android.content.Context;
 import android.content.res.TypedArray;
+import android.os.Build;
+import android.os.Looper;
 import android.support.annotation.IntDef;
 import android.support.annotation.Nullable;
+import android.support.annotation.UiThread;
 import android.support.v4.view.NestedScrollingChild;
 import android.support.v4.view.NestedScrollingChildHelper;
 import android.support.v4.view.NestedScrollingParent;
@@ -43,12 +46,22 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
     public @interface HeaderStatus {
     }
 
+    /**
+     * Collapse status - perform collapse processing
+     */
     public static final int COLLAPSING = 1;
+    /**
+     * Collapse status - stay collapsed idle
+     */
     public static final int COLLAPSED = 2;
+    /**
+     * Collapse status - perform expand processing
+     */
     public static final int EXPANDING = 3;
+    /**
+     * Collapse status - stay expanded idle
+     */
     public static final int EXPANDED = 4;
-
-    private static final Object S_LOCK = HeaderCollapsibleLayout.class;
 
     protected boolean mIsEnabled = true;
     protected boolean mIsScrollingDown;
@@ -62,7 +75,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
     private OnHeaderStatusChangedListener mSingleHeaderStatusChangedListener;
     private int mOrgHeaderHeight = -1;
     private int mOrgHeaderHeightBackup = -1;
-    private int mOverlayFooterLayoutId = -1;
+    private int mOverlayFooterId = -1;
     private int mOvershootDistance;
     private boolean mSupportFlingAction;
     private boolean mAutoDrawerModeEnabled = true;
@@ -105,6 +118,14 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 
         initStyleable(context, attrs);
 
+        if (mTopView != null) {
+            addView(mTopView);
+        }
+
+        if (mBottomView != null) {
+            addView(mBottomView);
+        }
+
         mParentHelper = new NestedScrollingParentHelper(this);
         mChildHelper = new NestedScrollingChildHelper(this);
 
@@ -126,7 +147,13 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
         super.onDetachedFromWindow();
 
         ViewTreeObserver observer = getViewTreeObserver();
-        if (observer.isAlive()) {
+        if (!observer.isAlive()) {
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            observer.removeOnGlobalLayoutListener(this);
+        } else {
             observer.removeGlobalOnLayoutListener(this);
         }
     }
@@ -148,8 +175,8 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
             getHeight();
         }
 
-        if (mOverlayFooterLayoutId != -1) {
-            View overlayFooter = mTopView.findViewById(mOverlayFooterLayoutId);
+        if (mOverlayFooterId != -1) {
+            View overlayFooter = mTopView.findViewById(mOverlayFooterId);
 
             if (overlayFooter != null) {
                 mOrgHeaderHeight = mOrgHeaderHeight - overlayFooter.getMeasuredHeight();
@@ -185,6 +212,40 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 //        super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(height + mOrgHeaderHeight, MeasureSpec.EXACTLY));
     }
 
+    @Override
+    protected void onFinishInflate() {
+        super.onFinishInflate();
+
+        if (mTopView != null && mBottomView != null) {
+            return;
+        }
+
+        int childCount = getChildCount();
+        View child;
+        ViewGroup first, second = first = null;
+        for (int index = 0; index < childCount; index++) {
+            child = getChildAt(index);
+            if (!(child instanceof ViewGroup)) {
+                continue;
+            }
+
+            if (first == null) {
+                first = (ViewGroup) child;
+                continue;
+            }
+
+            second = (ViewGroup) child;
+            break;
+        }
+
+        if (mTopView == null && first != null && first != mBottomView) {
+            mTopView = first;
+        }
+        if (mBottomView == null && second != null && second != mTopView) {
+            mBottomView = second;
+        }
+    }
+
     protected void onFirstLayout() {
     }
 
@@ -195,16 +256,22 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 
         final TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.HeaderCollapsibleLayout, 0, 0);
 
-        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_topPanelLayoutId)) {
-            initTopView(a.getResourceId(R.styleable.HeaderCollapsibleLayout_topPanelLayoutId, -1), this);
+        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_topPanelLayout)) {
+            int headerLayout = a.getResourceId(R.styleable.HeaderCollapsibleLayout_topPanelLayout, -1);
+            if (headerLayout != -1) {
+                mTopView = (ViewGroup) LayoutInflater.from(mContext).inflate(headerLayout, this, false);
+            }
         }
 
-        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_bottomPanelLayoutId)) {
-            initBottomView(a.getResourceId(R.styleable.HeaderCollapsibleLayout_bottomPanelLayoutId, -1), this);
+        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_bottomPanelLayout)) {
+            int bodyLayout = a.getResourceId(R.styleable.HeaderCollapsibleLayout_bottomPanelLayout, -1);
+            if (bodyLayout != -1) {
+                mBottomView = (ViewGroup) LayoutInflater.from(mContext).inflate(bodyLayout, this, false);
+            }
         }
 
-        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_overlayFooterLayoutId)) {
-            mOverlayFooterLayoutId = a.getResourceId(R.styleable.HeaderCollapsibleLayout_overlayFooterLayoutId, -1);
+        if (a.hasValue(R.styleable.HeaderCollapsibleLayout_overlayFooterId)) {
+            mOverlayFooterId = a.getResourceId(R.styleable.HeaderCollapsibleLayout_overlayFooterId, -1);
         }
 
         if (a.hasValue(R.styleable.HeaderCollapsibleLayout_supportFlingAction)) {
@@ -223,31 +290,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
             mOvershootDistance = a.getInteger(R.styleable.HeaderCollapsibleLayout_overshootDistance, 0);
         }
 
-        if (mTopView != null) {
-            addView(mTopView);
-        }
-
-        if (mBottomView != null) {
-            addView(mBottomView);
-        }
-
         a.recycle();
-    }
-
-    private void initTopView(int layoutId, ViewGroup parent) {
-        if (layoutId == -1) {
-            return;
-        }
-
-        mTopView = (ViewGroup) LayoutInflater.from(mContext).inflate(layoutId, parent, false);
-    }
-
-    private void initBottomView(int layoutId, ViewGroup parent) {
-        if (layoutId == -1) {
-            return;
-        }
-
-        mBottomView = (ViewGroup) LayoutInflater.from(mContext).inflate(layoutId, parent, false);
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -264,16 +307,25 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
         mSingleHeaderStatusChangedListener = null;
     }
 
+    /**
+     * Add header status observe listener.
+     *
+     * @param callback header status changed observer
+     * @throws IllegalStateException Call this on work thread
+     */
+    @UiThread
     public void addOnHeaderStatusChangedListener(OnHeaderStatusChangedListener callback) {
-        synchronized (S_LOCK) {
-            if (mHeaderStatusChangedListeners == null) {
-                mHeaderStatusChangedListeners = new ArrayList<>();
-            }
-            if (mHeaderStatusChangedListeners.contains(callback)) {
-                return;
-            }
-            mHeaderStatusChangedListeners.add(callback);
+        if (Thread.currentThread() != Looper.getMainLooper().getThread()) {
+            throw new IllegalStateException("Should call this method on UiThread only.");
         }
+
+        if (mHeaderStatusChangedListeners == null) {
+            mHeaderStatusChangedListeners = new ArrayList<>();
+        }
+        if (mHeaderStatusChangedListeners.contains(callback)) {
+            return;
+        }
+        mHeaderStatusChangedListeners.add(callback);
     }
 
     public void removeOnHeaderStatusChangedListener(OnHeaderStatusChangedListener listener) {
@@ -408,7 +460,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
             }
         });
 
-        lastVelocityY = -0.1F; // To make sure next fling action performs well
+        lastVelocityY = -0.1F;  // To make sure next fling action performs well
     }
 
     public void disableCollapsing() {
@@ -609,7 +661,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 
     @Override
     public boolean onStartNestedScroll(View child, View target, int nestedScrollAxes) {
-        return (nestedScrollAxes & ViewCompat.SCROLL_AXIS_VERTICAL) != 0;
+        return (nestedScrollAxes & ViewCompat.SCROLL_AXIS_VERTICAL) == ViewCompat.SCROLL_AXIS_VERTICAL;
     }
 
     @Override
