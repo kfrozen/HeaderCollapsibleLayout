@@ -75,7 +75,8 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
     private OnHeaderStatusChangedListener mSingleHeaderStatusChangedListener;
     private int mOrgHeaderHeight = -1;
     private int mOrgHeaderHeightBackup = -1;
-    private int mOverlayFooterId = -1;
+    private int mStickyFooterLayoutId = -1;
+    private int mStickyFooterHeight = 0;
     private int mOvershootDistance;
     private boolean mSupportFlingAction;
     private boolean mAutoDrawerModeEnabled = true;
@@ -175,11 +176,12 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
             getHeight();
         }
 
-        if (mOverlayFooterId != -1) {
-            View overlayFooter = mTopView.findViewById(mOverlayFooterId);
+        if (mStickyFooterLayoutId != -1) {
+            View overlayFooter = mTopView.findViewById(mStickyFooterLayoutId);
 
             if (overlayFooter != null) {
-                mOrgHeaderHeight = mOrgHeaderHeight - overlayFooter.getMeasuredHeight();
+                mStickyFooterHeight = overlayFooter.getMeasuredHeight();
+                mStickyFooterHeight = Math.min(mOrgHeaderHeight, mStickyFooterHeight);
             }
         }
 
@@ -271,7 +273,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
         }
 
         if (a.hasValue(R.styleable.HeaderCollapsibleLayout_overlayFooterId)) {
-            mOverlayFooterId = a.getResourceId(R.styleable.HeaderCollapsibleLayout_overlayFooterId, -1);
+            mStickyFooterLayoutId = a.getResourceId(R.styleable.HeaderCollapsibleLayout_overlayFooterId, -1);
         }
 
         if (a.hasValue(R.styleable.HeaderCollapsibleLayout_supportFlingAction)) {
@@ -356,7 +358,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
     }
 
     public void collapse() {
-        changeHeaderHeightTo(0);
+        changeHeaderHeightTo(mStickyFooterHeight);
 
         mCurHeaderStatus = COLLAPSED;
 
@@ -364,7 +366,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
     }
 
     public void smoothCollapse() {
-        smoothChangeHeaderHeightTo(0, new AnimatorListener() {
+        smoothChangeHeaderHeightTo(mStickyFooterHeight, new AnimatorListener() {
             @Override
             public void onAnimationStart(Animator animation) {
                 mCurHeaderStatus = COLLAPSING;
@@ -544,7 +546,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
     private boolean shouldConsumeNestedScroll(int dy) {
         if (dy > 0) {
             //return getScrollY() < mOrgHeaderHeight;
-            return mTopView.getHeight() > 0;
+            return mTopView.getHeight() > mStickyFooterHeight;
         } else {
             //return getScrollY() > -mOvershootDistance;
             return mTopView.getHeight() < mOrgHeaderHeight + mOvershootDistance;
@@ -557,7 +559,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
     private boolean isReachedEdge(int dy) {
         if (dy > 0) {
             //return dy > (mOrgHeaderHeight - getScrollY());
-            return dy > mTopView.getHeight();
+            return dy > mTopView.getHeight() - mStickyFooterHeight;
         } else {
             //return Math.abs(dy) > (getScrollY() + mOvershootDistance);
             return Math.abs(dy) > (mOrgHeaderHeight + mOvershootDistance) - mTopView.getHeight();
@@ -633,13 +635,13 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
                 if (mHeaderStatusChangedListeners != null) {
                     for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
                         l.onHeaderOffsetChanged(mOrgHeaderHeight - layoutParams.height, mOrgHeaderHeight,
-                                ((mOrgHeaderHeight - layoutParams.height) * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
+                                ((mOrgHeaderHeight - layoutParams.height) * 1.0f) / (mOrgHeaderHeight - mStickyFooterHeight), mIsScrollingDown);
                     }
                 }
 
                 if (mSingleHeaderStatusChangedListener != null) {
                     mSingleHeaderStatusChangedListener.onHeaderOffsetChanged(mOrgHeaderHeight - layoutParams.height, mOrgHeaderHeight,
-                            ((mOrgHeaderHeight - layoutParams.height) * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
+                            ((mOrgHeaderHeight - layoutParams.height) * 1.0f) / (mOrgHeaderHeight - mStickyFooterHeight), mIsScrollingDown);
                 }
             }
         });
@@ -728,7 +730,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
                 }
             });
         } else {
-            smoothChangeHeaderHeightTo(0, new AnimatorListener() {
+            smoothChangeHeaderHeightTo(mStickyFooterHeight, new AnimatorListener() {
                 @Override
                 public void onAnimationStart(Animator animation) {
                 }
@@ -800,7 +802,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
         boolean isReachedEdge;
 
         //if (oldScrollY > -mOvershootDistance && oldScrollY <= mOrgHeaderHeight) {
-        if (headerHeight >= 0 && headerHeight < mOrgHeaderHeight + mOvershootDistance) {
+        if (headerHeight >= mStickyFooterHeight && mOrgHeaderHeight > 0 && headerHeight < mOrgHeaderHeight + mOvershootDistance) {
             if (isReachedEdge = isReachedEdge(dyUnconsumed)) {
                 if (dyUnconsumed < 0) {
                     //actualPerformedDy = -(getScrollY() + mOvershootDistance);
@@ -832,17 +834,17 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
             if (dyUnconsumed < 0) {
 
                 //if (oldScrollY <= mOrgHeaderHeight * 0.88 && mIsEnabled) //Give 12% buffer height here when sending out the expanding event, for better user experience
-                if (headerHeight >= mOrgHeaderHeight * 0.12 && mIsEnabled) {
+                if (headerHeight >= (mOrgHeaderHeight - mStickyFooterHeight) * 0.12 && mIsEnabled) {
                     if (mHeaderStatusChangedListeners != null) {
                         for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
                             l.onHeaderOffsetChanged(mOrgHeaderHeight - headerHeight, mOrgHeaderHeight,
-                                    ((mOrgHeaderHeight - headerHeight) * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
+                                    ((mOrgHeaderHeight - headerHeight) * 1.0f) / (mOrgHeaderHeight - mStickyFooterHeight), mIsScrollingDown);
                         }
                     }
 
                     if (mSingleHeaderStatusChangedListener != null) {
                         mSingleHeaderStatusChangedListener.onHeaderOffsetChanged(mOrgHeaderHeight - headerHeight, mOrgHeaderHeight,
-                                ((mOrgHeaderHeight - headerHeight) * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
+                                ((mOrgHeaderHeight - headerHeight) * 1.0f) / (mOrgHeaderHeight - mStickyFooterHeight), mIsScrollingDown);
                     }
 
                     if (mCurHeaderStatus != EXPANDING) {
@@ -912,7 +914,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 
             if (mCurHeaderStatus != COLLAPSING) {
                 //if (getScrollY() >= -mOvershootDistance && getScrollY() < mOrgHeaderHeight && mIsEnabled) {
-                if (headerHeight > 0 && headerHeight < (mOrgHeaderHeight + mOvershootDistance) && mIsEnabled) {
+                if (headerHeight > mStickyFooterHeight && headerHeight < (mOrgHeaderHeight + mOvershootDistance) && mIsEnabled) {
                     if (mHeaderStatusChangedListeners != null) {
                         for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
                             l.onHeaderStartCollapsing();
@@ -930,7 +932,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
             int actualPerformedDy;
 
             if (isReachedEdge(fixedDy)) {
-                actualPerformedDy = headerHeight;
+                actualPerformedDy = headerHeight - mStickyFooterHeight;
 
             } else {
                 actualPerformedDy = fixedDy;
@@ -948,18 +950,18 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
                 if (mHeaderStatusChangedListeners != null) {
                     for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
                         l.onHeaderOffsetChanged(mOrgHeaderHeight - headerHeight, mOrgHeaderHeight,
-                                ((mOrgHeaderHeight - headerHeight) * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
+                                ((mOrgHeaderHeight - headerHeight) * 1.0f) / (mOrgHeaderHeight - mStickyFooterHeight), mIsScrollingDown);
                     }
                 }
 
                 if (mSingleHeaderStatusChangedListener != null) {
                     mSingleHeaderStatusChangedListener.onHeaderOffsetChanged(mOrgHeaderHeight - headerHeight, mOrgHeaderHeight,
-                            ((mOrgHeaderHeight - headerHeight) * 1.0f) / mOrgHeaderHeight, mIsScrollingDown);
+                            ((mOrgHeaderHeight - headerHeight) * 1.0f) / (mOrgHeaderHeight - mStickyFooterHeight), mIsScrollingDown);
                 }
             }
 
             //if (dy > 0 && getScrollY() >= mOrgHeaderHeight && mIsEnabled) {
-            if (mTopView.getHeight() == 0 && mIsEnabled) {
+            if (mTopView.getHeight() == mStickyFooterHeight && mIsEnabled) {
                 if (mCurHeaderStatus != COLLAPSED) {
                     if (mHeaderStatusChangedListeners != null) {
                         for (OnHeaderStatusChangedListener l : mHeaderStatusChangedListeners) {
@@ -994,7 +996,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
             if (velocityY > 0 && lastVelocityY < 0) {
                 if (mCurHeaderStatus != COLLAPSED) {
                     // Smoothly collapsing the header
-                    smoothChangeHeaderHeightTo(0, new AnimatorListener() {
+                    smoothChangeHeaderHeightTo(mStickyFooterHeight, new AnimatorListener() {
                         @Override
                         public void onAnimationStart(Animator animation) {
                             mCurHeaderStatus = COLLAPSING;
