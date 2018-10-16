@@ -9,7 +9,7 @@ A wrapper layout that can easily split your current layout into header and body,
 
 ```groovy
 dependencies {
-    compile 'com.troy.collapsibleheaderlayout:collapsibleheaderlayout:2.0.3'
+    compile 'com.troy.collapsibleheaderlayout:collapsibleheaderlayout:2.0.4'
 }
 ```
 
