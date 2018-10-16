@@ -809,7 +809,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
                     actualPerformedDy = -(mOrgHeaderHeight - headerHeight + mOvershootDistance);
                 } else {
                     //actualPerformedDy = mOrgHeaderHeight - getScrollY();
-                    actualPerformedDy = headerHeight;
+                    actualPerformedDy = headerHeight - mStickyFooterHeight;
                 }
                 actualConsumedDy = actualPerformedDy;
             } else {
@@ -932,7 +932,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
             int actualPerformedDy;
 
             if (isReachedEdge(fixedDy)) {
-                actualPerformedDy = headerHeight - mStickyFooterHeight;
+                actualPerformedDy = headerHeight > mStickyFooterHeight ? headerHeight - mStickyFooterHeight : 0;
 
             } else {
                 actualPerformedDy = fixedDy;
