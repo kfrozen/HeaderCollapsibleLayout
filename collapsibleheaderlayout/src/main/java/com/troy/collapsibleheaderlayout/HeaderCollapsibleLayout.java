@@ -21,6 +21,7 @@ import android.support.v4.view.ViewCompat;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.ViewTreeObserver.OnGlobalLayoutListener;
@@ -91,6 +92,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 
     private float lastVelocityY = -0.1F;
     private int unconsumedDy;
+    private float touchSlop;
 
     public HeaderCollapsibleLayout(Context context) {
         super(context);
@@ -129,7 +131,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
 
         mParentHelper = new NestedScrollingParentHelper(this);
         mChildHelper = new NestedScrollingChildHelper(this);
-
+        touchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
         setNestedScrollingEnabled(true);
     }
 
@@ -698,7 +700,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
             return;
         }
         // Drawer adsorb effect
-        if (mIsScrollingDown) {
+        if (mIsScrollingDown && (mTopView.getHeight() > touchSlop)) {
             smoothChangeHeaderHeightTo(mOrgHeaderHeight, new AnimatorListener() {
                 @Override
                 public void onAnimationStart(Animator animation) {
@@ -729,7 +731,7 @@ public class HeaderCollapsibleLayout extends LinearLayout implements NestedScrol
                 public void onAnimationRepeat(Animator animation) {
                 }
             });
-        } else {
+        } else if (!mIsScrollingDown && mTopView.getHeight() < (mOrgHeaderHeight - touchSlop)){
             smoothChangeHeaderHeightTo(mStickyFooterHeight, new AnimatorListener() {
                 @Override
                 public void onAnimationStart(Animator animation) {
